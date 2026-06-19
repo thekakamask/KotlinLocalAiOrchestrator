@@ -131,6 +131,57 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - ComfyUI integration is not implemented in Kotlin yet
     - Agent execution is currently sequential, not parallel
 
+  
+### 🔹 **Update #3**
+
+  - 🔌 **Real Ollama HTTP integration**
+    - Replaced the `OllamaClient` placeholder with a working HTTP client
+    - Connected the Kotlin application to the local Ollama API
+    - Added support for the `/api/generate` endpoint
+    - Added HTTP status validation and error reporting
+    - Configured non-streaming responses with `stream = false`
+
+  - 📦 **JSON serialization support**
+    - Added the Kotlin serialization Gradle plugin
+    - Added the `kotlinx-serialization-json` dependency
+    - Added `OllamaGenerateRequest` to represent requests sent to Ollama
+    - Added `OllamaGenerateResponse` to represent responses received from Ollama
+    - Replaced manual JSON construction and regular-expression parsing with structured serialization
+    - Enabled `encodeDefaults` to include the `stream = false` value in requests
+    - Enabled `ignoreUnknownKeys` to accept additional fields returned by Ollama
+
+  - 🧠 **Agent-to-LLM connection**
+    - Connected `ManagerAgent`, `CodeAgent`, and `ReviewAgent` to the `LlmClient` abstraction
+    - Injected a shared `OllamaClient` instance into all text-based agents
+    - Assigned a dedicated local model to each agent:
+      - `ManagerAgent` → Mistral 7B
+      - `CodeAgent` → Qwen 2.5 Coder 7B
+      - `ReviewAgent` → DeepSeek Coder 6.7B
+    - Added dedicated system prompts to define each agent's role and behavior
+    - Replaced placeholder agent outputs with real locally generated model responses
+
+  - 🎛️ **Application dependency wiring**
+    - Updated `App.kt` to create the shared `OllamaClient`
+    - Injected the client into all registered LLM agents
+    - Preserved task validation, routing, sequential execution, and result aggregation
+    - Improved console output to display each agent response separately using `agentId`
+
+  - ✅ **End-to-end local integration test**
+    - Verified successful communication with the local Ollama runtime
+    - Verified availability of Mistral, Qwen, and DeepSeek models
+    - Executed a real `TaskType.CODE` orchestration request
+    - Confirmed successful responses from all three agents
+    - Confirmed the final `OrchestrationResult` returned `success = true`
+    - Confirmed successful application termination with exit code `0`
+
+  - ⚠️ **Current workflow limitations**
+    - Agents are still executed sequentially
+    - Each agent currently receives the original user instruction independently
+    - `CodeAgent` does not yet receive the plan produced by `ManagerAgent`
+    - `ReviewAgent` does not yet review the output produced by `CodeAgent`
+    - Final response synthesis is not implemented yet
+    - Prompt files stored in resources are not yet loaded dynamically
+
 
 ## 🤝 **Contributions**
 Contributions are welcome! Feel free to fork the repository and submit a pull request for new features or bug fixes✅🟩❌.

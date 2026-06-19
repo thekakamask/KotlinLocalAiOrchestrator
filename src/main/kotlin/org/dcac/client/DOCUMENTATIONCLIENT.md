@@ -1,62 +1,177 @@
 # KotlinAiOrchestrator - Client Overview
 
-
 ## 📌 Summary
 
-The `client` package is responsible for all communication with external AI backends and local inference services.
-Its purpose is to isolate infrastructure concerns from the business logic of the orchestrator and agents.
-This package acts as the integration layer between the Kotlin orchestration engine and the underlying model providers such as Ollama and future media services.
-By centralizing all external calls in this package, the project ensures clear separation between orchestration logic and provider-specific implementations.
-This package is intended to support extensibility, allowing the orchestrator to switch or add providers without impacting the agents layer.
+The `client` package is the integration layer between the Kotlin orchestration system and external or local AI services.
+Its purpose is to isolate infrastructure and provider-specific communication from agents, task routing, and orchestration logic.
+The current implementation connects the application to the local Ollama HTTP API.
+
+This package currently contains:
+- `LlmClient` → common contract for language model backends
+- `OllamaClient` → working local Ollama HTTP implementation
+- `OllamaGenerateRequest` → request DTO sent to Ollama
+- `OllamaGenerateResponse` → response DTO received from Ollama
+
+By using the `LlmClient` abstraction, agents do not need to understand HTTP requests, JSON serialization, API endpoints, or provider-specific response formats.
 
 
 ## 🧩 Classes Description
 
 ### `LlmClient`
 
-The `LlmClient` interface defines the common contract for any language model backend used by the system.
-Its purpose is to abstract the communication with text-generation providers so that agents remain independent from any specific implementation.
-This interface will allow the orchestrator to interact with multiple backends through a unified API.
+The `LlmClient` interface defines the common contract for language model backends.
+Its purpose is to keep text-based agents independent from a specific model provider.
 
-Its future responsibilities include:
-- sending prompts to language models
-- selecting the target model
-- handling system and user prompts
-- standardizing text generation requests
-- enabling provider interchangeability
+The interface currently defines one function:
+- `generate(model, systemPrompt, userPrompt)` → sends a generation request and returns generated text
 
-This interface is designed to support both local and remote providers.
+The function receives:
+- `model` → identifies the model that should process the request
+- `systemPrompt` → defines the role and behavior of the model
+- `userPrompt` → contains the task instruction
+- return value → generated model response as a `String`
 
-Future implementations may include:
-- `OllamaClient`
-- `OpenAiClient`
-- `DeepSeekClient`
-- `QwenClient`
-- hybrid multi-provider clients
+Current agents depend on `LlmClient` instead of depending directly on `OllamaClient`.
+This allows the same agent implementation to work with another client implementation in the future.
 
-The main goal is to decouple agents from infrastructure details.
+Current usage:
+- `ManagerAgent` calls `LlmClient` with Mistral 7B
+- `CodeAgent` calls `LlmClient` with Qwen 2.5 Coder 7B
+- `ReviewAgent` calls `LlmClient` with DeepSeek Coder 6.7B
+
+Possible future implementations:
+- another local LLM runtime client
+- remote API client
+- test or fake client
+- cached client
+- fallback multi-provider client
+- hybrid local and remote client
+
+Its main purpose is to decouple agent behavior from infrastructure details.
 
 
 ### `OllamaClient`
 
-`OllamaClient` is intended to be the primary local LLM provider implementation.
-Its role is to manage communication with the local Ollama runtime through its HTTP API.
-This class will become the main bridge between the orchestrator and locally hosted language models.
+`OllamaClient` is the current implementation of `LlmClient`.
+Its role is to communicate with the local Ollama runtime through its HTTP API.
 
-Its future responsibilities include:
-- calling Ollama REST endpoints
-- sending prompts and system instructions
-- selecting the appropriate local model
-- parsing generated responses
-- handling request errors
-- managing timeouts and retries
-- supporting streaming responses
-- future performance monitoring
+Current default endpoint:
+- base URL → `http://localhost:11434`
+- generation endpoint → `/api/generate`
 
-This class will be used by agents to interact with models such as:
-- Mistral
-- Qwen
-- DeepSeek
+The client uses Java's `HttpClient` to create and send synchronous HTTP requests.
 
-Its main purpose is to provide a clean and reusable infrastructure layer for all text-based agents.
-In the future, this package may also include additional clients for media generation services such as `ComfyUiClient`.
+Current responsibilities:
+- receive the selected model
+- receive the system prompt
+- receive the user prompt
+- create an `OllamaGenerateRequest`
+- serialize the request into JSON
+- send an HTTP POST request to Ollama
+- validate the HTTP status code
+- deserialize the Ollama JSON response
+- return only the generated text
+
+The current request is configured with:
+- `stream = false`
+
+This configuration instructs Ollama to return one complete JSON response instead of multiple streamed JSON fragments.
+
+If Ollama returns a non-successful HTTP status, `OllamaClient` stops execution and throws an error containing:
+- the HTTP status code
+- the response body returned by Ollama
+
+The current implementation is shared by all text-based agents. `App.kt` creates one `OllamaClient` instance and injects it into `ManagerAgent`, `CodeAgent`, and `ReviewAgent`.
+
+
+## 📦 Ollama DTOs
+
+### `OllamaGenerateRequest`
+
+`OllamaGenerateRequest` represents the JSON body sent to Ollama's `/api/generate` endpoint.
+It is annotated with `@Serializable` so Kotlinx Serialization can convert it into JSON.
+
+Current properties:
+- `model` → local Ollama model name
+- `system` → system prompt defining the agent role
+- `prompt` → user instruction sent to the model
+- `stream` → controls response streaming and currently defaults to `false`
+
+Example model values:
+- `mistral:7b`
+- `qwen2.5-coder:7b`
+- `deepseek-coder:6.7b`
+
+The JSON configuration uses `encodeDefaults = true` to ensure that the default `stream = false` value is included in the request.
+Without this configuration, Ollama would use streaming mode and return multiple JSON objects.
+
+
+### `OllamaGenerateResponse`
+
+`OllamaGenerateResponse` represents the useful part of the JSON response returned by Ollama.
+It is annotated with `@Serializable` so Kotlinx Serialization can convert the JSON response into a Kotlin object.
+
+Current property:
+- `response` → contains the generated text returned by the selected model
+
+Ollama also returns additional technical fields, such as model information, execution duration, token counts, and completion status.
+
+The current JSON configuration uses:
+- `ignoreUnknownKeys = true`
+
+This allows the application to ignore fields that are returned by Ollama but are not declared in `OllamaGenerateResponse`.
+
+The client currently extracts and returns only:
+- `generateResponse.response`
+
+
+## 🔄 Current Client Workflow
+
+The current client workflow is:
+1. An agent calls `LlmClient.generate()`.
+2. `OllamaClient` creates an `OllamaGenerateRequest`.
+3. Kotlinx Serialization converts the request object into JSON.
+4. Java `HttpClient` sends the JSON to `/api/generate`.
+5. Ollama executes the selected local model.
+6. Ollama returns one complete JSON response.
+7. Kotlinx Serialization converts the JSON into `OllamaGenerateResponse`.
+8. `OllamaClient` returns the generated text to the agent.
+9. The agent stores the text inside an `AgentResult`.
+
+
+## ⚠️ Current Limitations
+
+The current client integration successfully generates local model responses, but it still has several limitations:
+- HTTP requests are synchronous and blocking
+- request timeout configuration is not implemented
+- retry strategies are not implemented
+- connection failure handling is limited
+- model availability is not checked before generation
+- streaming responses are not supported
+- cancellation is not supported
+- token usage is not stored
+- execution duration is not stored
+- detailed Ollama metadata is ignored
+- client errors currently propagate and can stop the complete workflow
+- configuration is not yet loaded dynamically from `application.properties`
+
+
+## 🚀 Future Responsibilities
+
+Possible future improvements:
+- configure connection and request timeouts
+- add retry and fallback strategies
+- check Ollama health before execution
+- verify model availability
+- support streamed responses
+- use Kotlin coroutines for asynchronous requests
+- support request cancellation
+- return structured generation metadata
+- record token usage and execution duration
+- improve exception types and error messages
+- load the base URL from `application.properties`
+- add test and fake client implementations
+- add a `ComfyUiClient` for image and video workflows
+- support multiple local or remote providers
+
+Its long-term purpose is to provide a stable and extensible integration layer for every AI backend used by KotlinLocalAiOrchestrator.

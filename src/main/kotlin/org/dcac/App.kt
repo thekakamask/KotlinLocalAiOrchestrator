@@ -3,6 +3,7 @@ package org.dcac
 import org.dcac.agents.CodeAgent
 import org.dcac.agents.ManagerAgent
 import org.dcac.agents.ReviewAgent
+import org.dcac.client.OllamaClient
 import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
 import org.dcac.models.TaskType
@@ -15,6 +16,10 @@ import org.dcac.tasks.TaskValidator
  * It wires the core components and executes one sample task.
  */
 fun main() {
+
+    // Create the Ollama client used by agents to communicate with the local LLM runtime.
+    val ollamaClient = OllamaClient()
+
     // Create the central orchestrator that will coordinate the full task execution.
     val orchestrator = AiOrchestrator(
         // Configure the router responsible for selecting which agents should handle a task.
@@ -22,11 +27,11 @@ fun main() {
             // Register the agents currently available in the local orchestration pipeline.
             agents = listOf(
                 // Manager agent: responsible for high-level planning and coordination.
-                ManagerAgent(),
+                ManagerAgent(ollamaClient),
                 // Code agent: responsible for implementation-oriented work.
-                CodeAgent(),
+                CodeAgent(ollamaClient),
                 // Review agent: responsible for checking and reviewing generated work.
-                ReviewAgent()
+                ReviewAgent(ollamaClient)
             )
         ),
         // Add the validator that checks whether a task is valid before execution starts.
@@ -50,6 +55,16 @@ fun main() {
     // Execute the task through the orchestrator and collect the final result.
     val result = orchestrator.execute(task, context)
     // Print the orchestration result to the console.
-    println(result)
+    println("Task: ${result.taskId}")
+    println("Success: ${result.success}")
+
+    result.results.forEach { agentResult ->
+        println()
+        println("Agent: ${agentResult.agentId}")
+        println("Success: ${agentResult.success}")
+        println("Response:")
+        println(agentResult.output)
+        println("----------------------------------------")
+    }
 }
 

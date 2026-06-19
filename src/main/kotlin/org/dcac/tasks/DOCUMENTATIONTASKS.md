@@ -1,75 +1,128 @@
 # KotlinAiOrchestrator - Tasks Overview
 
-
 ## 📌 Summary
 
-The `tasks` package is responsible for managing the lifecycle of tasks before they are executed by specialized agents.
-Its role is to prepare each task for orchestration by handling classification, validation, and routing decisions.
-This package acts as the workflow preparation layer of the system.
-It ensures that every task is correctly categorized, validated, and assigned to the most appropriate agents before execution begins.
-The purpose of this package is to separate workflow preparation logic from both the orchestrator and the agents.
+The `tasks` package prepares orchestration tasks before agents execute them.
+
+Its responsibilities are divided into three operations:
+- classification with `TaskClassifier`
+- validation with `TaskValidator`
+- agent selection with `TaskRouter`
+
+This package separates task preparation and routing rules from agent implementation and orchestration logic.
+At the current stage, validation and routing are integrated into the main workflow. Classification exists but is not yet connected to `App.kt` or `AiOrchestrator`.
 
 
 ## 🧩 Classes Description
 
 ### `TaskClassifier`
 
-`TaskClassifier` is designed to determine the most appropriate task category based on the user instruction.
-Its role is to analyze incoming task content and assign a `TaskType`.
-This class is intended to become the first intelligence layer of the workflow pipeline.
+`TaskClassifier` determines a `TaskType` from a user instruction.
+It currently uses a lightweight keyword-based strategy. The instruction is converted to lowercase and checked for known words.
 
-Its future responsibilities include:
-- instruction analysis
-- keyword-based detection
-- task categorization
-- routing hints generation
-- future intent detection
-- possible LLM-based semantic classification
+Current classification rules:
+- `review` or `audit` → `TaskType.REVIEW`
+- `test` → `TaskType.TEST`
+- `doc` → `TaskType.DOCUMENTATION`
+- `image` → `TaskType.IMAGE`
+- `video` → `TaskType.VIDEO`
+- `code` or `implement` → `TaskType.CODE`
+- no recognized keyword → `TaskType.GENERAL`
 
-At the current stage, it uses a lightweight keyword heuristic.
+The order of these checks is important. The first matching rule determines the returned task type.
+`TaskClassifier` is currently implemented but is not connected to the main workflow. In `App.kt`, the task type is still assigned manually when the `OrchestrationTask` is created.
 
-In the future, this component may evolve into a more advanced classification system based on:
-- rules engine
-- prompt-based LLM classification
-- confidence scoring
-- multi-label task detection
+Possible future improvements:
+- connect classification to the application entry point
+- support more keywords and task categories
+- return a classification confidence score
+- detect multiple task types
+- use an LLM for semantic classification
+- combine rule-based and LLM-based classification
+- generate routing hints
 
-Its purpose is to provide the routing system with a clear task category.
+Its purpose is to automatically identify the nature of a user request before routing begins.
 
 
 ### `TaskRouter`
 
-`TaskRouter` is responsible for selecting which agents should process a given task.
-Its role is to evaluate the capabilities of all available agents and route the task to the appropriate ones.
-This class is intended to become the dispatch layer of the workflow.
+`TaskRouter` selects the agents that should process an `OrchestrationTask`.
+It receives the list of available agents when it is created. For each task, it calls the `supports()` function of every registered agent.
+Agents returning `true` are included in the execution list.
 
-Its future responsibilities include:
-- agent capability checks
-- task-to-agent mapping
-- multi-agent selection
-- fallback routing
+The current application registers:
+- `ManagerAgent`
+- `CodeAgent`
+- `ReviewAgent`
+
+For a `TaskType.CODE` task:
+- `ManagerAgent` is selected because it currently supports every task
+- `CodeAgent` is selected because it supports code-related tasks
+- `ReviewAgent` is selected because it supports code and review-related tasks
+
+The selected agents are returned in their registration order. `AiOrchestrator` currently executes them sequentially in that same order.
+
+Current routing responsibilities:
+- inspect every registered agent
+- call `supports(task)` on each agent
+- select all compatible agents
+- return the selected agent list to `AiOrchestrator`
+
+Possible future improvements:
 - priority-based routing
-- future load balancing
-- specialized workflow branching
+- fallback agents
+- dynamic agent registration
+- routing based on model availability
+- load balancing
+- specialized workflow branches
+- selecting only one agent when appropriate
+- routing based on previous agent results
 
-The router uses the `supports()` method of each agent to determine compatibility.
-Its purpose is to create a flexible and extensible routing mechanism.
-This class will play a central role in collaborative multi-agent execution.
+Its purpose is to keep agent selection independent from the central orchestrator.
 
 
 ### `TaskValidator`
 
-`TaskValidator` is designed to verify task integrity before any execution starts.
-Its role is to ensure that incoming tasks contain all required information.
-This class acts as the safety gate of the orchestration pipeline.
+`TaskValidator` verifies an `OrchestrationTask` before routing and execution begin.
 
-Its future responsibilities include:
-- mandatory field validation
-- format checks
-- business rule validation
-- task consistency checks
-- dependency validation
-- future security and sanitization checks
+It currently performs two validations:
+- the task title must not be blank
+- the task instruction must not be blank
 
-The purpose of this class is to prevent invalid tasks from entering the workflow.
-This helps improve reliability and reduces execution errors across the orchestrator.
+The `validate()` function returns a list of error messages.
+If the list is empty, the task is considered valid.
+If the list contains errors, `AiOrchestrator` stops the workflow and returns an unsuccessful `OrchestrationResult` without executing any agent.
+
+Current validation messages:
+- `title must not be blank`
+- `instruction must not be blank`
+
+Possible future improvements:
+- validate the task identifier
+- validate supported task types
+- check instruction length
+- sanitize user input
+- validate project and target paths
+- verify task dependencies
+- apply business rules
+- add security checks
+- return structured validation errors
+
+Its purpose is to prevent incomplete or invalid tasks from entering the agent execution workflow.
+
+
+## 🔁 Current Tasks Workflow
+
+The current task preparation flow is:
+1. `App.kt` creates an `OrchestrationTask` with a manually assigned `TaskType`.
+2. `AiOrchestrator` sends the task to `TaskValidator`.
+3. Invalid tasks stop before agent execution.
+4. Valid tasks are passed to `TaskRouter`.
+5. `TaskRouter` checks every registered agent with `supports(task)`.
+6. Compatible agents are returned to `AiOrchestrator`.
+7. `AiOrchestrator` executes the selected agents sequentially.
+
+`TaskClassifier` is not yet part of this flow.
+
+The future flow will automatically classify the user instruction before validation and routing:
+User instruction → classification → validation → routing → agent execution

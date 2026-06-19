@@ -1,72 +1,135 @@
 # KotlinAiOrchestrator - Orchestrator Overview
 
-
 ## 📌 Summary
 
-The `orchestrator` package contains the central coordination layer of the entire system.
-Its role is to supervise the complete execution lifecycle of a task from validation to final result aggregation.
-This package acts as the brain of the application by connecting task validation, routing, agent execution, and response synthesis.
-It is responsible for transforming a single user request into a fully orchestrated multi-agent workflow.
-The orchestrator is the main entry point of the business execution pipeline.
+The `orchestrator` package contains the central coordination layer of the system.
+Its role is to manage the complete execution lifecycle of an OrchestrationTask, from validation to final result aggregation.
+
+This package connects:
+- task validation
+- agent routing
+- agent execution
+- result aggregation
+- global success evaluation
+
+The `orchestrator` does not generate AI responses directly. It coordinates the components responsible for processing the task.
+The package currently contains the AiOrchestrator class.
 
 
 ## 🧩 Classes Description
 
-### `AiOrchestrator`
+### AiOrchestrator
+`AiOrchestrator` is the main execution service of the application.
+Its role is to coordinate every step required to process an OrchestrationTask.
 
-`AiOrchestrator` is designed to be the central application service of the project.
-Its role is to coordinate every major step of the orchestration workflow.
-This class is intended to become the main execution engine of the platform.
+The class receives two dependencies:
+- `TaskValidator` → verifies that the task is valid
+- `TaskRouter` → selects the agents compatible with the task
 
-Its future responsibilities include:
-- receiving incoming tasks
-- validating task integrity
-- invoking task classification and routing
-- selecting appropriate agents
-- executing agent workflows
-- aggregating agent results
-- determining global success state
-- building the final orchestration response
+Its main function is execute().
 
-This class is the core decision and coordination layer between the domain models, task workflow services, and agents.
+This function receives:
+- an `OrchestrationTask` containing the user request
+- an `ExecutionContext` containing runtime information
+
+It returns an OrchestrationResult containing:
+- the task identifier1100001
+- the global success status
+- the results returned by the selected agents
+
+Current responsibilities:
+- receive a task and its execution context
+- validate the task with TaskValidator
+- stop execution when validation fails
+- select compatible agents with TaskRouter
+- execute the selected agents
+- collect every AgentResult
+- calculate the global success status
+- build and return the final OrchestrationResult
+
+Its purpose is to keep coordination logic separate from task preparation, agent behavior, and external API communication.
 
 
-## ⚙️ Workflow Role
+## ⚙️ Current Execution Workflow
 
-The `AiOrchestrator` is responsible for controlling the full execution flow.
+The current orchestration workflow follows these steps:
+- `App.kt` creates an OrchestrationTask.
+- `App.kt` creates an ExecutionContext.
+- Both objects are passed to `AiOrchestrator.execute()`.
+- `TaskValidator` checks the task.
+- Invalid tasks return an unsuccessful result without executing agents.
+- Valid tasks are passed to `TaskRouter`.
+- `TaskRouter` selects all compatible agents.
+- `AiOrchestrator` executes the selected agents sequentially.
+- Each agent returns an AgentResult.
+- All agent results are grouped into an `OrchestrationResult`.
 
-Its future execution pipeline is designed around the following steps:
-1. **Task validation**  
-   Ensure the incoming task contains all required information and can be processed.
-2. **Task routing**  
-   Determine which specialized agents are able to handle the task.
-3. **Agent execution**  
-   Execute all selected agents using the shared execution context.
-4. **Result aggregation**  
-   Collect all agent outputs into a single orchestration result.
-5. **Global success evaluation**  
-   Determine whether the workflow succeeded globally.
-6. **Final response construction**  
-   Return a standardized `OrchestrationResult`
+For the current `TaskType.CODE` example, the selected agents are:
+- `ManagerAgent`
+- `CodeAgent`
+- `ReviewAgent`
 
-This makes the orchestrator the central coordinator of the multi-agent architecture.
+The current execution order is:
+- `ManagerAgent` using Mistral 7B
+- `CodeAgent` using Qwen 2.5 Coder 7B
+- `ReviewAgent` using DeepSeek Coder 6.7B
+
+Each agent currently receives the same original OrchestrationTask and ExecutionContext.
+
+
+## ✅ Validation Failure
+
+If TaskValidator returns one or more errors, `AiOrchestrator` stops the workflow.
+
+It returns an OrchestrationResult containing:
+- the original task identifier
+- success = false
+- an empty list of agent results
+
+No agent or Ollama model is called when validation fails.
+
+
+## 📦 Result Aggregation
+
+After agent execution, `AiOrchestrator` collects every returned AgentResult.
+The global success status is calculated using all individual results.
+The orchestration succeeds only when every selected agent returns success = true.
+The final `OrchestrationResult` is then returned to the application entry point.
+
+
+## ⚠️ Current Limitations
+
+The orchestrator currently supports real local LLM execution, but the collaborative workflow is still limited.
+
+Current limitations:
+- agents are executed sequentially
+- every agent receives the original instruction independently
+- `ManagerAgent` output is not passed to `CodeAgent`
+- `CodeAgent` output is not passed to `ReviewAgent`
+- `ReviewAgent` does not yet review the real code-agent response
+- one agent exception can stop the complete workflow
+- retry and fallback strategies are not implemented
+- final response synthesis is not implemented
+- workflow state is not persisted
+- execution metrics are not collected
 
 
 ## 🚀 Future Responsibilities
 
-As the project evolves, this class is expected to become significantly more advanced.
+Possible future improvements:
+- automatically classify tasks before routing
+- decompose complex requests into subtasks
+- pass results between agents
+- add real manager-agent supervision
+- allow `ReviewAgent` to review `CodeAgent` output
+- synthesize a single final response
+- isolate agent failures
+- add retry and fallback strategies
+- execute independent agents in parallel
+- use Kotlin coroutines
+- track workflow state
+- collect execution duration and model metrics
+- support dependency-aware workflows
+- support DAG or pipeline execution
 
-Planned future capabilities may include:
-- parallel agent execution with Kotlin coroutines
-- task decomposition into subtasks
-- dependency-aware workflow execution
-- agent priority management
-- retry and fallback strategies
-- cross-agent validation
-- manager-agent supervision
-- workflow state tracking
-- performance monitoring
-- future DAG / pipeline execution
-
-Its long-term purpose is to become a fully featured local AI workflow engine.
-This class will eventually serve as the backbone of the entire orchestration platform.
+Its long-term purpose is to become the central workflow engine of the complete KotlinLocalAiOrchestrator platform.
