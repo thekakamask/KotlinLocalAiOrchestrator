@@ -8,6 +8,7 @@ import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
 import org.dcac.models.TaskType
 import org.dcac.orchestrator.AiOrchestrator
+import org.dcac.prompts.PromptLoader
 import org.dcac.tasks.TaskRouter
 import org.dcac.tasks.TaskValidator
 
@@ -20,6 +21,14 @@ fun main() {
     // Create the Ollama client used by agents to communicate with the local LLM runtime.
     val ollamaClient = OllamaClient()
 
+    // Create the prompt loader used to read agent system prompts from resources.
+    val promptLoader = PromptLoader()
+
+    // Load the system prompts used by each specialized agent.
+    val managerPrompt = promptLoader.loadPrompt("prompts/manager.txt")
+    val codePrompt = promptLoader.loadPrompt("prompts/code.txt")
+    val reviewPrompt = promptLoader.loadPrompt("prompts/review.txt")
+
     // Create the central orchestrator that will coordinate the full task execution.
     val orchestrator = AiOrchestrator(
         // Configure the router responsible for selecting which agents should handle a task.
@@ -27,11 +36,20 @@ fun main() {
             // Register the agents currently available in the local orchestration pipeline.
             agents = listOf(
                 // Manager agent: responsible for high-level planning and coordination.
-                ManagerAgent(ollamaClient),
+                ManagerAgent(
+                    llmClient = ollamaClient,
+                    systemPrompt = managerPrompt
+                ),
                 // Code agent: responsible for implementation-oriented work.
-                CodeAgent(ollamaClient),
+                CodeAgent(
+                    llmClient = ollamaClient,
+                    systemPrompt = codePrompt
+                ),
                 // Review agent: responsible for checking and reviewing generated work.
-                ReviewAgent(ollamaClient)
+                ReviewAgent(
+                    llmClient = ollamaClient,
+                    systemPrompt = reviewPrompt
+                )
             )
         ),
         // Add the validator that checks whether a task is valid before execution starts.
@@ -61,7 +79,15 @@ fun main() {
     result.results.forEach { agentResult ->
         println()
         println("Agent: ${agentResult.agentId}")
+        println("Role: ${agentResult.role}")
+        println("Model: ${agentResult.model}")
         println("Success: ${agentResult.success}")
+
+        if (agentResult.errorMessage != null) {
+            println("Error:")
+            println(agentResult.errorMessage)
+        }
+
         println("Response:")
         println(agentResult.output)
         println("----------------------------------------")

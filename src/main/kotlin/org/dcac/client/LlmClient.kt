@@ -8,6 +8,6 @@ package org.dcac.client
 // Define the common contract used to communicate with a language model backend.
 interface LlmClient {
     // Generate a text response using a selected model, a system prompt, and a user prompt.
-    fun generate(model: String, systemPrompt: String, userPrompt: String): String
+    fun generate(model: String, systemPrompt: String, userPrompt: String): LlmResponse
 }
 

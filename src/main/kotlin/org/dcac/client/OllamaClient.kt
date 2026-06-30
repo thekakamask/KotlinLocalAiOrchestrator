@@ -32,7 +32,7 @@ class OllamaClient(
         model: String,
         systemPrompt: String,
         userPrompt: String
-    ): String {
+    ): LlmResponse {
         // Create the structured request object sent to Ollama.
         val generateRequest = OllamaGenerateRequest(
             model = model,
@@ -68,8 +68,11 @@ class OllamaClient(
         val generateResponse =
             json.decodeFromString<OllamaGenerateResponse>(httpResponse.body())
 
-        // Return only the generated text.
-        return generateResponse.response.trim()
+        return LlmResponse(
+            requestedModel = model,
+            actualModel = generateResponse.model,
+            text = generateResponse.response.trim()
+        )
     }
 }
 

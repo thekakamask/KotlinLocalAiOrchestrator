@@ -10,7 +10,7 @@ This platform is designed around a collaborative multi-agent architecture where 
    - 🎨 **Juggernaut (Image Agent)** → image generation workflows, visual mockups, diagrams, and media automation
    - 🎥 **Stable Video (Video Agent)** → local video generation workflows and media pipeline extensions
 
-The current Kotlin implementation includes a working orchestration pipeline connected to Ollama. ManagerAgent, CodeAgent, and ReviewAgent now generate real responses using their dedicated local models.
+The current Kotlin implementation includes a working chained orchestration pipeline connected to Ollama. ManagerAgent produces an execution plan, CodeAgent generates the implementation from that plan, and ReviewAgent reviews the generated code using dedicated local models.
 
 The entire ecosystem runs 100% locally and fully offline.
 
@@ -33,28 +33,29 @@ The entire ecosystem runs 100% locally and fully offline.
 
 ## ✅ **LAST MAJOR UPDATES (see [UPDATES.md](./UPDATES.md) for details)**
 
-   - Real Ollama HTTP integration implemented
-   - Kotlin serialization added for JSON requests and responses
-   - Ollama request and response DTOs added
-   - ManagerAgent connected to Mistral 7B
-   - CodeAgent connected to Qwen 2.5 Coder 7B
-   - ReviewAgent connected to DeepSeek Coder 6.7B
-   - Shared OllamaClient injected into all text-based agents
-   - Real local model responses successfully tested
-   - Agent responses now displayed separately in the console
+   - Sequential multi-agent workflow implemented
+   - `ManagerAgent` output is now shared with `CodeAgent`
+   - `CodeAgent` output is now shared with `ReviewAgent`
+   - `ExecutionContext` now carries workflow-level agent outputs
+   - `AgentResult` enriched with role, confirmed model, and error metadata
+   - `LlmResponse` added for structured LLM responses
+   - Ollama responses now expose the actual model confirmed by the backend
+   - Agent system prompts externalized into `src/main/resources/prompts`
+   - `PromptLoader` added to load prompt templates at runtime
+   - Agent prompts refined to improve role separation and reduce unsupported review claims
 
 
 ## ❌ **NEXT UPDATES**
 
-   - Load agent system prompts from resources
-   - Pass ManagerAgent output to CodeAgent
-   - Pass CodeAgent output to ReviewAgent
-   - Add final response synthesis
-   - Add automated tests for clients, agents, routing, and orchestration
+   - Improve agent-level and client-level error handling
+   - Prevent full orchestration crashes when one agent fails
+   - Return failed `AgentResult` entries with clear `errorMessage` values
+   - Add automated tests for `TaskValidator`, `TaskRouter`, `AiOrchestrator`, and prompt loading
+   - Add final response synthesis after agent execution
    - Add real file generation workflow
+   - Wire `TaskClassifier` into the main workflow
    - Add ComfyUI client
    - Enable parallel execution where appropriate
-   - Improve error handling and agent failure isolation
 
 
 ## 📋 **Features**
@@ -122,7 +123,8 @@ The entire ecosystem runs 100% locally and fully offline.
    - **org.dcac.models** - shared domain models used across the orchestration workflow
    - **org.dcac.tasks** - task validation, classification, and routing components
    - **org.dcac.orchestrator** - central orchestration workflow coordinating validation, routing, execution, and result aggregation
-   - **src/main/resources** - application configuration and prompt templates
+   - **org.dcac.prompts** - prompt loading utilities used to read agent system prompts from resources
+   - **src/main/resources** - application configuration and externalized prompt templates
    - **ARCHITECTURE.md** - detailed documentation of the current Kotlin orchestration structure
 
 
@@ -130,30 +132,34 @@ The entire ecosystem runs 100% locally and fully offline.
 
    - A user request is represented as an `OrchestrationTask`
    - The task is executed with an `ExecutionContext`
+   - Agent system prompts are loaded from `src/main/resources/prompts`
    - `AiOrchestrator` validates the task with `TaskValidator`
    - `TaskRouter` selects compatible agents according to the task type
    - `ManagerAgent` sends the request to Mistral 7B through `OllamaClient`
-   - `CodeAgent` sends the request to Qwen 2.5 Coder 7B through `OllamaClient`
-   - `ReviewAgent` sends the request to DeepSeek Coder 6.7B through `OllamaClient`
+   - `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs`
+   - `CodeAgent` receives the original instruction and the manager plan, then sends the enriched prompt to Qwen 2.5 Coder 7B
+   - `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs`
+   - `ReviewAgent` receives the original instruction, the manager plan, and the generated code, then sends the review prompt to DeepSeek Coder 6.7B
    - `OllamaClient` serializes requests and deserializes responses with Kotlinx Serialization
-   - Each agent returns a real `AgentResult`
+   - `LlmResponse` stores both the requested model and the actual model confirmed by Ollama
+   - Each agent returns an enriched `AgentResult`
    - `AiOrchestrator` aggregates all agent results into an `OrchestrationResult`
-   - Agent responses are displayed separately using their `agentId`
+   - Agent responses are displayed separately with `agentId`, `role`, `model`, `success`, and `output`
    - Selected agents are currently executed sequentially
 
 
 ## ⚠️ **Current Limitations**
 
-The project currently contains the first Kotlin orchestration skeleton.
+The project currently contains a working first version of the local chained orchestration pipeline.
 
-   - Each agent receives the original user instruction independently
-   - `ManagerAgent` output is not yet passed to `CodeAgent`
-   - `ReviewAgent` does not yet review the output produced by `CodeAgent`
+   - The manager agent creates a plan but does not yet dynamically decide which agents should run
+   - `TaskRouter` still controls agent selection through static support rules
    - Final response synthesis is not implemented yet
    - Task type is currently provided manually
    - `TaskClassifier` is not wired into the main workflow yet
-   - Prompt files exist but are not loaded dynamically at runtime
-   - Generated code is not written to files yet
+   - Generated code is displayed in the console but not written to files yet
+   - Error handling is still basic and should be improved
+   - If one agent or the Ollama client fails, failure isolation is not fully implemented yet
    - ComfyUI integration is not implemented in Kotlin yet
    - Agent execution is currently sequential
    - Automated tests are not implemented yet

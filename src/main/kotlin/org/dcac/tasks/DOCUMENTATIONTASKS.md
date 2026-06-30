@@ -60,12 +60,18 @@ For a `TaskType.CODE` task:
 - `CodeAgent` is selected because it supports code-related tasks
 - `ReviewAgent` is selected because it supports code and review-related tasks
 
-The selected agents are returned in their registration order. `AiOrchestrator` currently executes them sequentially in that same order.
+The selected agents are returned in their registration order. `AiOrchestrator` executes them sequentially in that same order.
+
+This order is important because the current workflow shares data between agents through `ExecutionContext.agentOutputs`.
+For example, in a `TaskType.CODE` workflow:
+- `ManagerAgent` must run before `CodeAgent` so the code agent can use the manager plan
+- `CodeAgent` must run before `ReviewAgent` so the review agent can review the generated code
 
 Current routing responsibilities:
 - inspect every registered agent
 - call `supports(task)` on each agent
 - select all compatible agents
+- preserve agent registration order for chained execution
 - return the selected agent list to `AiOrchestrator`
 
 Possible future improvements:
@@ -120,9 +126,11 @@ The current task preparation flow is:
 4. Valid tasks are passed to `TaskRouter`.
 5. `TaskRouter` checks every registered agent with `supports(task)`.
 6. Compatible agents are returned to `AiOrchestrator`.
-7. `AiOrchestrator` executes the selected agents sequentially.
+7. `AiOrchestrator` executes the selected agents sequentially in registration order.
+8. After each agent execution, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
+9. Downstream agents can use previous outputs if their implementation supports it.
 
 `TaskClassifier` is not yet part of this flow.
 
 The future flow will automatically classify the user instruction before validation and routing:
-User instruction → classification → validation → routing → agent execution
+User instruction → classification → validation → routing → chained agent execution

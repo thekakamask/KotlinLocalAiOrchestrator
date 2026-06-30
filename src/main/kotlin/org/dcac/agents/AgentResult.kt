@@ -8,9 +8,20 @@ package org.dcac.agents
 data class AgentResult(
     // Identifier of the agent that produced this result.
     val agentId: String,
+
+    // Human-readable role of the agent in the orchestration workflow.
+    val role: String,
+
+    // Local or remote model used by this agent to generate the result.
+    val model: String,
+
     // Indicates whether the agent execution succeeded.
     val success: Boolean,
+
     // Text output produced by the agent.
-    val output: String
+    val output: String,
+
+    // Optional error message when the agent execution fails.
+    val errorMessage: String? = null
 )
 

@@ -2,6 +2,7 @@
 package org.dcac.orchestrator
 
 // Import the runtime context passed to agents during execution.
+import org.dcac.agents.AgentResult
 import org.dcac.models.ExecutionContext
 // Import the final result type returned by the orchestrator.
 import org.dcac.models.OrchestrationResult
@@ -40,8 +41,29 @@ class AiOrchestrator(
             )
         }
 
-        // Route the task to compatible agents, execute each one, and collect their results.
-        val results = router.route(task).map { agent -> agent.run(task, context) }
+        // Select the agents that can handle this task.
+        val selectedAgents = router.route(task)
+
+        // Keep all agent results produced during the workflow.
+        val results = mutableListOf<AgentResult>()
+
+        // Keep a mutable version of the execution context so each agent can enrich it.
+        var currentContext = context
+
+        // Execute selected agents sequentially
+        for (agent in selectedAgents) {
+            // Run the current agent with the latest workflow context.
+            val result = agent.run(task, currentContext)
+
+            //Store the result returned by this agent.
+            results.add(result)
+
+            // Add this agent output to the context so the next agents can use it.
+            currentContext = currentContext.copy(
+                agentOutputs = currentContext.agentOutputs + (result.agentId to result.output)
+            )
+        }
+
         // Return the final orchestration result after all selected agents have run.
         return OrchestrationResult(
             // Keep the original task id in the final result.

@@ -9,14 +9,18 @@ KotlinLocalAiOrchestrator currently provides a modular, fully local orchestratio
 
 The architecture follows this execution flow:
 1. A user request is represented by domain objects from `models`.
-2. The task is validated and routed by components from `tasks`.
-3. `AiOrchestrator` coordinates the complete execution workflow.
-4. Compatible agents from `agents` process the task.
-5. Text-based agents use `LlmClient` to communicate with Ollama.
-6. `OllamaClient` serializes requests and sends them to local models.
-7. Each agent returns an `AgentResult`.
-8. The orchestrator aggregates all results into an `OrchestrationResult`.
-9. The application displays each agent response separately.
+2. Agent system prompts are loaded from `src/main/resources/prompts`.
+3. The task is validated and routed by components from `tasks`.
+4. `AiOrchestrator` coordinates the complete chained execution workflow.
+5. Compatible agents from `agents` process the task sequentially.
+6. `ManagerAgent` produces an execution plan.
+7. `CodeAgent` receives the original instruction and the manager plan.
+8. `ReviewAgent` receives the original instruction, the manager plan, and the generated code.
+9. Text-based agents use `LlmClient` to communicate with Ollama.
+10. `OllamaClient` serializes requests and sends them to local models.
+11. Each agent returns an enriched `AgentResult`.
+12. The orchestrator aggregates all results into an `OrchestrationResult`.
+13. The application displays each agent response separately.
 
 The current workflow runs entirely on the local machine.
 
@@ -28,6 +32,8 @@ The current runtime entry point is:
 
 `App.kt` creates and connects the main application components:
 - one shared `OllamaClient`
+- one `PromptLoader`
+- loaded prompts for manager, code, and review agents
 - `ManagerAgent`
 - `CodeAgent`
 - `ReviewAgent`
@@ -39,19 +45,26 @@ The current runtime entry point is:
 
 The current execution flow is:
 1. `App.kt` creates an `OllamaClient`.
-2. The same client instance is injected into all text-based agents.
-3. The agents are registered inside `TaskRouter`.
-4. `App.kt` creates an `OrchestrationTask`.
-5. The task type is currently assigned manually.
-6. `App.kt` creates an `ExecutionContext`.
-7. Both objects are passed to `AiOrchestrator.execute()`.
-8. `TaskValidator` validates the task.
-9. `TaskRouter` selects compatible agents.
-10. Selected agents execute sequentially.
-11. Each agent calls its assigned local Ollama model.
-12. Each model response is returned as an `AgentResult`.
-13. `AiOrchestrator` aggregates the results into an `OrchestrationResult`.
-14. `App.kt` displays each response separately using its `agentId`.
+2. `App.kt` creates a `PromptLoader`.
+3. The prompt loader reads `prompts/manager.txt`, `prompts/code.txt`, and `prompts/review.txt`.
+4. The same `OllamaClient` instance and the loaded system prompts are injected into the text-based agents.
+5. The agents are registered inside `TaskRouter`.
+6. `App.kt` creates an `OrchestrationTask`.
+7. The task type is currently assigned manually.
+8. `App.kt` creates an `ExecutionContext`.
+9. Both objects are passed to `AiOrchestrator.execute()`.
+10. `TaskValidator` validates the task.
+11. `TaskRouter` selects compatible agents.
+12. Selected agents execute sequentially.
+13. `ManagerAgent` creates a plan with Mistral 7B.
+14. `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs`.
+15. `CodeAgent` uses the original instruction and the manager plan to generate code with Qwen 2.5 Coder 7B.
+16. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs`.
+17. `ReviewAgent` uses the original instruction, the manager plan, and the generated code to review the result with DeepSeek Coder 6.7B.
+18. Each model response is returned through `LlmResponse`.
+19. Each agent wraps its response into an enriched `AgentResult`.
+20. `AiOrchestrator` aggregates the results into an `OrchestrationResult`.
+21. `App.kt` displays each response separately with agent metadata.
 
 For the current `TaskType.CODE` example, the execution order is:
 1. `ManagerAgent` using Mistral 7B
@@ -85,6 +98,7 @@ Contains the infrastructure required to communicate with language model backends
 
 Current components:
 - `LlmClient`
+- `LlmResponse`
 - `OllamaClient`
 - `OllamaGenerateRequest`
 - `OllamaGenerateResponse`
@@ -123,6 +137,16 @@ Contains the central application coordination service.
 `AiOrchestrator` validates tasks, routes them, executes selected agents, evaluates global success, and builds the final result.
 
 
+### `org.dcac.prompts`
+
+Contains prompt-loading utilities.
+
+Current components:
+- `PromptLoader`
+
+This package loads prompt templates from `src/main/resources/prompts` so agent behavior can be changed without modifying Kotlin source code.
+
+
 ### `src/main/resources`
 
 Contains external configuration and prompt templates.
@@ -133,7 +157,7 @@ Current resources:
 - `prompts/code.txt`
 - `prompts/review.txt`
 
-These resources exist but are not yet loaded dynamically by the current runtime workflow.
+Prompt resources are now loaded dynamically at runtime through `PromptLoader`.
 
 
 ## 4. File-by-File Description
@@ -173,10 +197,13 @@ Defines the standard result returned by an agent.
 
 Current properties:
 - `agentId`
+- `role`
+- `model`
 - `success`
 - `output`
+- `errorMessage`
 
-The `output` currently contains real text generated by the agent's assigned Ollama model.
+The `model` value is populated from the actual model confirmed by the LLM backend through `LlmResponse.actualModel`.
 
 
 ### `src/main/kotlin/org/dcac/agents/ManagerAgent.kt`
@@ -189,8 +216,8 @@ Current configuration:
 - supports → every task type
 - backend → `LlmClient`
 
-It currently sends the original user instruction to Mistral and returns a real generated response.
-Its output is not yet passed to the other agents.
+It sends the original user instruction to Mistral and returns a planning response.
+Its output is stored in `ExecutionContext.agentOutputs["manager"]` so downstream agents can use it.
 
 
 ### `src/main/kotlin/org/dcac/agents/CodeAgent.kt`
@@ -203,8 +230,9 @@ Current configuration:
 - supports → `CODE`, `TEST`, `DOCUMENTATION`, and `GENERAL`
 - backend → `LlmClient`
 
-It currently sends the original user instruction to Qwen and returns a real generated code response.
-It does not yet use the plan produced by `ManagerAgent`.
+It receives the original user instruction and the manager plan from `ExecutionContext.agentOutputs["manager"]`.
+It sends an enriched prompt to Qwen and returns generated implementation output.
+Its output is stored in `ExecutionContext.agentOutputs["code"]`.
 
 
 ### `src/main/kotlin/org/dcac/agents/ReviewAgent.kt`
@@ -217,8 +245,8 @@ Current configuration:
 - supports → `REVIEW`, `CODE`, `TEST`, and `GENERAL`
 - backend → `LlmClient`
 
-It currently sends the original user instruction to DeepSeek and returns a real generated response.
-It does not yet receive or review the output produced by `CodeAgent`.
+It receives the original user instruction, the manager plan, and the code output from `ExecutionContext.agentOutputs["code"]`.
+It sends an enriched review prompt to DeepSeek and returns a structured review.
 
 
 ## Client
@@ -228,7 +256,7 @@ It does not yet receive or review the output produced by `CodeAgent`.
 Defines the common contract for text-generation providers.
 
 Current function:
-- `generate(model, systemPrompt, userPrompt)`
+- `generate(model, systemPrompt, userPrompt): LlmResponse`
 
 This abstraction keeps agents independent from the concrete Ollama implementation.
 
@@ -243,7 +271,7 @@ Current responsibilities:
 - send an HTTP POST request to `/api/generate`
 - validate the HTTP response status
 - deserialize the Ollama response
-- return only the generated text
+- return a structured `LlmResponse` containing the requested model, the actual model confirmed by Ollama, and the generated text
 
 The client uses:
 - Java `HttpClient`
@@ -251,6 +279,18 @@ The client uses:
 - `stream = false`
 - `encodeDefaults = true`
 - `ignoreUnknownKeys = true`
+
+
+### `src/main/kotlin/org/dcac/client/LlmResponse.kt`
+
+Standard response returned by an LLM backend.
+
+Current properties:
+- `requestedModel`
+- `actualModel`
+- `text`
+
+This object allows the application to display the model actually confirmed by Ollama instead of only displaying the model requested by the agent.
 
 
 ### `src/main/kotlin/org/dcac/client/OllamaDtos.kt`
@@ -273,7 +313,8 @@ Current properties:
 
 Represents the useful part of the JSON response returned by Ollama.
 
-Current property:
+Current properties:
+- `model`
 - `response`
 
 Both DTOs use `@Serializable`.
@@ -315,8 +356,10 @@ Contains runtime information shared with agents.
 Current properties:
 - `projectPath`
 - `userLocale`
+- `agentOutputs`
 
-The context is passed to every selected agent but is not yet actively used by the current agent implementations.
+`agentOutputs` stores previous agent responses during the same workflow.
+It allows `CodeAgent` to use the manager plan and `ReviewAgent` to review the generated code.
 
 
 ### `src/main/kotlin/org/dcac/models/OrchestrationResult.kt`
@@ -373,7 +416,9 @@ Current responsibilities:
 - stop invalid task execution
 - route valid tasks
 - execute selected agents sequentially
-- collect agent results
+- maintain a progressively enriched `ExecutionContext`
+- store each agent output in `ExecutionContext.agentOutputs`
+- collect enriched agent results
 - calculate global success
 - return an `OrchestrationResult`
 
@@ -395,19 +440,31 @@ The current Kotlin runtime does not yet load these values dynamically.
 ### `src/main/resources/prompts/manager.txt`
 
 Contains the initial manager system prompt template.
-The current `ManagerAgent` still defines its system prompt directly in Kotlin.
+This prompt is loaded at runtime by `PromptLoader` and injected into `ManagerAgent`.
 
 
 ### `src/main/resources/prompts/code.txt`
 
 Contains the initial code-agent system prompt template.
-The current `CodeAgent` still defines its system prompt directly in Kotlin.
+This prompt is loaded at runtime by `PromptLoader` and injected into `CodeAgent`.
 
 
 ### `src/main/resources/prompts/review.txt`
 
 Contains the initial review-agent system prompt template.
-The current `ReviewAgent` still defines its system prompt directly in Kotlin.
+This prompt is loaded at runtime by `PromptLoader` and injected into `ReviewAgent`.
+
+
+## Prompts
+
+### `src/main/kotlin/org/dcac/prompts/PromptLoader.kt`
+
+Loads prompt templates from classpath resources.
+
+Current responsibility:
+- load prompt text from `src/main/resources`
+- fail fast if a prompt resource cannot be found
+- return trimmed prompt content for injection into agents
 
 
 ## 5. Current Status
@@ -418,23 +475,28 @@ Implemented:
 - task validation
 - capability-based agent routing
 - central sequential orchestration
+- shared workflow memory through `ExecutionContext.agentOutputs`
+- chained manager → code → review workflow
 - shared `LlmClient` abstraction
+- structured `LlmResponse`
 - working Ollama HTTP client
 - Kotlinx Serialization integration
 - Ollama request and response DTOs
-- real Mistral response generation
-- real Qwen response generation
-- real DeepSeek response generation
-- agent result aggregation
-- readable console output
+- actual model confirmation from Ollama responses
+- prompt loading through `PromptLoader`
+- externalized agent prompts in `src/main/resources/prompts`
+- real Mistral planning response generation
+- real Qwen implementation response generation
+- real DeepSeek review response generation
+- enriched agent result aggregation
+- readable console output with agent metadata
 - successful end-to-end local execution
 
 Current limitations:
-- agents process the original instruction independently
-- agent outputs are not passed between agents
+- the manager creates a plan but does not yet dynamically decide which agents should run
+- `TaskRouter` still controls agent selection through static support rules
 - task classification is not connected
-- prompt resources are not loaded dynamically
-- configuration is not loaded dynamically
+- configuration is not loaded dynamically from `application.properties`
 - generated code is not written to files
 - errors are not isolated per agent
 - automated tests are not implemented
@@ -443,13 +505,13 @@ Current limitations:
 - final response synthesis is not implemented
 
 Planned next:
-1. Pass `ManagerAgent` output to `CodeAgent`.
-2. Pass `CodeAgent` output to `ReviewAgent`.
-3. Add final response synthesis.
-4. Load system prompts from resources.
-5. Load Ollama configuration from `application.properties`.
-6. Add automated tests.
-7. Add structured error handling.
+1. Add structured client and agent error handling.
+2. Prevent full orchestration crashes when one agent fails.
+3. Return failed `AgentResult` entries with clear error messages.
+4. Add automated tests.
+5. Add final response synthesis.
+6. Wire `TaskClassifier` into the main workflow.
+7. Load Ollama configuration from `application.properties`.
 8. Add generated file support.
 9. Add ComfyUI integration.
 10. Add asynchronous or parallel execution where appropriate.

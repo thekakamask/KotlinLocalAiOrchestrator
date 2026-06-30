@@ -12,5 +12,6 @@ data class OllamaGenerateRequest(
 
 @Serializable
 data class OllamaGenerateResponse(
+    val model: String,
     val response: String
 )
