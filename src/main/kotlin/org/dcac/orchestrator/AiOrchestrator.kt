@@ -37,7 +37,8 @@ class AiOrchestrator(
                 // Mark the global orchestration execution as failed.
                 success = false,
                 // No agent result exists because execution stopped during validation.
-                results = emptyList()
+                results = emptyList(),
+                errors = errors
             )
         }
 

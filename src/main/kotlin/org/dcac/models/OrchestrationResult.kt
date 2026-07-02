@@ -15,6 +15,8 @@ data class OrchestrationResult(
     // Global success flag computed from all agent results.
     val success: Boolean,
     // Collection of results returned by each selected agent.
-    val results: List<AgentResult>
+    val results: List<AgentResult>,
+    // Validation or orchestration-level errors that are not tied to a specific agent.
+    val errors: List<String> = emptyList()
 )
 

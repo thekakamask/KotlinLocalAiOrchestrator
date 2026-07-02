@@ -66,11 +66,12 @@ class CodeAgent(
 
     // Execute the task and return the CodeAgent result.
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
-        // Read the manager output if it already exists in the workflow context.
-        val managerPlan = context.agentOutputs["manager"]
+        return try {
+            // Read the manager output if it already exists in the workflow context.
+            val managerPlan = context.agentOutputs["manager"]
 
-        // Build a richer prompt using both the original user instruction and the manager plan.
-        val userPrompt = """
+            // Build a richer prompt using both the original user instruction and the manager plan.
+            val userPrompt = """
             User instruction:
             ${task.instruction}
             
@@ -80,23 +81,34 @@ class CodeAgent(
             Generate only the implementation based on the user instruction and the manager plan.
             """.trimIndent()
 
-        // Ask the configured local LLM model to generate the code response.
-        val llmResponse = llmClient.generate(
-            model = model,
-            systemPrompt = systemPrompt,
-            userPrompt = userPrompt
-        )
+            // Ask the configured local LLM model to generate the code response.
+            val llmResponse = llmClient.generate(
+                model = model,
+                systemPrompt = systemPrompt,
+                userPrompt = userPrompt
+            )
 
-        // Build a structured result for the orchestrator.
-        return AgentResult(
-            // Store this agent identifier in the result.
-            agentId = id,
-            role = "Implementation agent",
-            // Mark this execution as successful if no exception was thrown.
-            success = true,
-            model = llmResponse.actualModel,
-            output = llmResponse.text
-        )
+            // Build a structured result for the orchestrator.
+            AgentResult(
+                // Store this agent identifier in the result.
+                agentId = id,
+                role = "Implementation agent",
+                // Mark this execution as successful if no exception was thrown.
+                success = true,
+                model = llmResponse.actualModel,
+                output = llmResponse.text
+            )
+        } catch ( exception: Exception) {
+            // Return a failed result instead of crashing the full orchestration workflow.
+            AgentResult(
+                agentId = id,
+                role = "Implementation agent",
+                model = model,
+                success = false,
+                output = "",
+                errorMessage = exception.message ?: "Unknown code agent error"
+            )
+        }
     }
 }
 

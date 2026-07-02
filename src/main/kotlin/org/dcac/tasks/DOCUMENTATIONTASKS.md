@@ -97,11 +97,14 @@ It currently performs two validations:
 
 The `validate()` function returns a list of error messages.
 If the list is empty, the task is considered valid.
-If the list contains errors, `AiOrchestrator` stops the workflow and returns an unsuccessful `OrchestrationResult` without executing any agent.
+If the list contains errors, `AiOrchestrator` stops the workflow and returns an unsuccessful `OrchestrationResult` with the validation errors stored in `OrchestrationResult.errors`.
+No agent is executed when validation fails.
 
 Current validation messages:
 - `title must not be blank`
 - `instruction must not be blank`
+
+These validation errors are exposed at orchestration level instead of being tied to a specific `AgentResult`.
 
 Possible future improvements:
 - validate the task identifier
@@ -112,7 +115,7 @@ Possible future improvements:
 - verify task dependencies
 - apply business rules
 - add security checks
-- return structured validation errors
+- replace plain string validation errors with structured validation error objects
 
 Its purpose is to prevent incomplete or invalid tasks from entering the agent execution workflow.
 
@@ -122,7 +125,7 @@ Its purpose is to prevent incomplete or invalid tasks from entering the agent ex
 The current task preparation flow is:
 1. `App.kt` creates an `OrchestrationTask` with a manually assigned `TaskType`.
 2. `AiOrchestrator` sends the task to `TaskValidator`.
-3. Invalid tasks stop before agent execution.
+3. Invalid tasks stop before agent execution and their validation messages are returned in `OrchestrationResult.errors`.
 4. Valid tasks are passed to `TaskRouter`.
 5. `TaskRouter` checks every registered agent with `supports(task)`.
 6. Compatible agents are returned to `AiOrchestrator`.
@@ -131,6 +134,7 @@ The current task preparation flow is:
 9. Downstream agents can use previous outputs if their implementation supports it.
 
 `TaskClassifier` is not yet part of this flow.
+Task validation behavior is covered by JVM unit tests in `TaskValidatorTest`.
 
 The future flow will automatically classify the user instruction before validation and routing:
 User instruction → classification → validation → routing → chained agent execution

@@ -66,14 +66,15 @@ class ReviewAgent(
 
     // Execute the task and return the ReviewAgent result.
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
-        // Read the manager output if it already exists in the workflow context.
-        val managerPlan = context.agentOutputs["manager"]
+        return try {
+            // Read the manager output if it already exists in the workflow context.
+            val managerPlan = context.agentOutputs["manager"]
 
-        // Read the code output produced by the CodeAgent.
-        val generatedCode = context.agentOutputs["code"]
+            // Read the code output produced by the CodeAgent.
+            val generatedCode = context.agentOutputs["code"]
 
-        // Build a richer review prompt using the original request, the manager plan, and the generated code.
-        val userPrompt = """
+            // Build a richer review prompt using the original request, the manager plan, and the generated code.
+            val userPrompt = """
              User instruction:
              ${task.instruction}
              
@@ -87,21 +88,32 @@ class ReviewAgent(
              Focus on correctness, maintainability, missing requirements, risks, and concrete improvements.
              """.trimIndent()
 
-        // Ask the configured local LLM model to generate the review response.
-        val llmResponse = llmClient.generate(
-            model = model,
-            systemPrompt = systemPrompt,
-            userPrompt = userPrompt
-        )
+            // Ask the configured local LLM model to generate the review response.
+            val llmResponse = llmClient.generate(
+                model = model,
+                systemPrompt = systemPrompt,
+                userPrompt = userPrompt
+            )
 
-        // Build a structured result for the orchestrator.
-        return AgentResult(
-            agentId = id,
-            role = "Code review agent",
-            success = true,
-            model = llmResponse.actualModel,
-            output = llmResponse.text
-        )
+            // Build a structured result for the orchestrator.
+            AgentResult(
+                agentId = id,
+                role = "Code review agent",
+                success = true,
+                model = llmResponse.actualModel,
+                output = llmResponse.text
+            )
+        } catch (exception : Exception) {
+            // Return a failed result instead of crashing the full orchestration workflow.
+            AgentResult(
+                agentId = id,
+                role = "Code review agent",
+                model = model,
+                success = false,
+                output = "",
+                errorMessage = exception.message ?: "Unknown review agent error"
+            )
+        }
     }
 }
 

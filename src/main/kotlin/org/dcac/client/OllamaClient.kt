@@ -7,7 +7,6 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import kotlinx.serialization.encodeToString
-
 /**
  * LLM client implementation used to communicate with the local Ollama API.
  */
@@ -33,46 +32,57 @@ class OllamaClient(
         systemPrompt: String,
         userPrompt: String
     ): LlmResponse {
-        // Create the structured request object sent to Ollama.
-        val generateRequest = OllamaGenerateRequest(
-            model = model,
-            system = systemPrompt,
-            prompt = userPrompt
-        )
+        try {
+            // Create the structured request object sent to Ollama.
+            val generateRequest = OllamaGenerateRequest(
+                model = model,
+                system = systemPrompt,
+                prompt = userPrompt
+            )
 
-        // Convert the request object into valid JSON.
-        val requestBody = json.encodeToString(generateRequest)
+            // Convert the request object into valid JSON.
+            val requestBody = json.encodeToString(generateRequest)
 
-        // Build the HTTP request sent to Ollama's generation endpoint.
-        val httpRequest = HttpRequest.newBuilder()
-            .uri(URI.create("$baseUrl/api/generate"))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .build()
+            // Build the HTTP request sent to Ollama's generation endpoint.
+            val httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create("$baseUrl/api/generate"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build()
 
-        // Send the HTTP request synchronously.
-        val httpResponse = httpClient.send(
-            httpRequest,
-            HttpResponse.BodyHandlers.ofString()
-        )
+            // Send the HTTP request synchronously.
+            val httpResponse = httpClient.send(
+                httpRequest,
+                HttpResponse.BodyHandlers.ofString()
+            )
 
-        // Stop execution if Ollama returns an HTTP error.
-        if (httpResponse.statusCode() !in 200..299) {
-            error(
-                "Ollama request failed with HTTP " +
-                        "${httpResponse.statusCode()}: ${httpResponse.body()}"
+            // Stop execution if Ollama returns an HTTP error.
+            if (httpResponse.statusCode() !in 200..299) {
+                throw LlmClientException(
+                    "Ollama request failed with HTTP " +
+                            "${httpResponse.statusCode()}: ${httpResponse.body()}"
+                )
+            }
+
+            // Convert Ollama's JSON response into a Kotlin object.
+            val generateResponse =
+                json.decodeFromString<OllamaGenerateResponse>(httpResponse.body())
+
+            return LlmResponse(
+                requestedModel = model,
+                actualModel = generateResponse.model,
+                text = generateResponse.response.trim()
+            )
+        } catch (exception : LlmClientException) {
+            // Keep already structured LLM errors unchanged.
+            throw exception
+        } catch (exception : Exception) {
+            // Convert unexpected client, network, or parsing into a clear LLM client exception.
+            throw LlmClientException(
+                message = "Failed to generate response with Ollama model '$model'.",
+                cause = exception
             )
         }
-
-        // Convert Ollama's JSON response into a Kotlin object.
-        val generateResponse =
-            json.decodeFromString<OllamaGenerateResponse>(httpResponse.body())
-
-        return LlmResponse(
-            requestedModel = model,
-            actualModel = generateResponse.model,
-            text = generateResponse.response.trim()
-        )
     }
 }
 

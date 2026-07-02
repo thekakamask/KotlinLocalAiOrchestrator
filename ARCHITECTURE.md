@@ -17,10 +17,10 @@ The architecture follows this execution flow:
 7. `CodeAgent` receives the original instruction and the manager plan.
 8. `ReviewAgent` receives the original instruction, the manager plan, and the generated code.
 9. Text-based agents use `LlmClient` to communicate with Ollama.
-10. `OllamaClient` serializes requests and sends them to local models.
-11. Each agent returns an enriched `AgentResult`.
-12. The orchestrator aggregates all results into an `OrchestrationResult`.
-13. The application displays each agent response separately.
+10. `OllamaClient` serializes requests, sends them to local models, and converts client failures into `LlmClientException`.
+11. Each agent returns an enriched `AgentResult`, including success or failure metadata.
+12. The orchestrator aggregates all results and validation errors into an `OrchestrationResult`.
+13. The application displays orchestration-level errors and agent responses separately.
 
 The current workflow runs entirely on the local machine.
 
@@ -54,17 +54,19 @@ The current execution flow is:
 8. `App.kt` creates an `ExecutionContext`.
 9. Both objects are passed to `AiOrchestrator.execute()`.
 10. `TaskValidator` validates the task.
-11. `TaskRouter` selects compatible agents.
-12. Selected agents execute sequentially.
-13. `ManagerAgent` creates a plan with Mistral 7B.
-14. `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs`.
-15. `CodeAgent` uses the original instruction and the manager plan to generate code with Qwen 2.5 Coder 7B.
-16. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs`.
-17. `ReviewAgent` uses the original instruction, the manager plan, and the generated code to review the result with DeepSeek Coder 6.7B.
-18. Each model response is returned through `LlmResponse`.
-19. Each agent wraps its response into an enriched `AgentResult`.
-20. `AiOrchestrator` aggregates the results into an `OrchestrationResult`.
-21. `App.kt` displays each response separately with agent metadata.
+11. If validation fails, `AiOrchestrator` returns an unsuccessful `OrchestrationResult` with validation errors and no agent execution.
+12. `TaskRouter` selects compatible agents.
+13. Selected agents execute sequentially.
+14. `ManagerAgent` creates a plan with Mistral 7B.
+15. `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs`.
+16. `CodeAgent` uses the original instruction and the manager plan to generate code with Qwen 2.5 Coder 7B.
+17. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs`.
+18. `ReviewAgent` uses the original instruction, the manager plan, and the generated code to review the result with DeepSeek Coder 6.7B.
+19. Each model response is returned through `LlmResponse`.
+20. If an agent fails, it returns an `AgentResult` with `success = false` and `errorMessage`.
+21. Each agent wraps its response into an enriched `AgentResult`.
+22. `AiOrchestrator` aggregates the results and errors into an `OrchestrationResult`.
+23. `App.kt` displays each response separately with agent metadata.
 
 For the current `TaskType.CODE` example, the execution order is:
 1. `ManagerAgent` using Mistral 7B
@@ -99,11 +101,12 @@ Contains the infrastructure required to communicate with language model backends
 Current components:
 - `LlmClient`
 - `LlmResponse`
+- `LlmClientException`
 - `OllamaClient`
 - `OllamaGenerateRequest`
 - `OllamaGenerateResponse`
 
-This package isolates HTTP communication and JSON serialization from agent behavior.
+This package isolates HTTP communication, JSON serialization, structured LLM responses, and client-level error handling from agent behavior.
 
 
 ### `org.dcac.models`
@@ -160,6 +163,23 @@ Current resources:
 Prompt resources are now loaded dynamically at runtime through `PromptLoader`.
 
 
+### `src/test/kotlin`
+
+Contains JVM unit tests and reusable fake test utilities.
+
+Current test utilities:
+- `FakeTasks`
+- `FakeLlmClient`
+- `FakeAgent`
+
+Current tested areas:
+- task validation
+- agent success and failure behavior
+- orchestrator validation handling
+- orchestrator result aggregation
+- context sharing between agents
+
+
 ## 4. File-by-File Description
 
 ## Root Entry
@@ -175,6 +195,7 @@ Prompt resources are now loaded dynamically at runtime through `PromptLoader`.
 - Creates the `ExecutionContext`
 - Executes the orchestration workflow
 - Displays each `AgentResult` separately
+- Displays orchestration-level validation errors
 
 
 ## Agents
@@ -271,6 +292,7 @@ Current responsibilities:
 - send an HTTP POST request to `/api/generate`
 - validate the HTTP response status
 - deserialize the Ollama response
+- convert HTTP, network, JSON, and unexpected client failures into `LlmClientException`
 - return a structured `LlmResponse` containing the requested model, the actual model confirmed by Ollama, and the generated text
 
 The client uses:
@@ -279,6 +301,18 @@ The client uses:
 - `stream = false`
 - `encodeDefaults = true`
 - `ignoreUnknownKeys = true`
+
+
+### `src/main/kotlin/org/dcac/client/LlmClientException.kt`
+
+Represents failures produced by LLM backend clients.
+
+Current purpose:
+- distinguish LLM client failures from generic runtime errors
+- wrap HTTP, network, JSON parsing, and unexpected client errors
+- provide clearer error messages to agents
+
+Agents catch these failures and convert them into failed `AgentResult` values.
 
 
 ### `src/main/kotlin/org/dcac/client/LlmResponse.kt`
@@ -370,8 +404,10 @@ Current properties:
 - `taskId`
 - `success`
 - `results`
+- `errors`
 
-The global success value is `true` only when every selected agent reports success.
+The global success value is `true` only when validation succeeds and every selected agent reports success.
+The `errors` field stores validation or orchestration-level errors that are not tied to a specific agent.
 
 
 ## Tasks
@@ -414,6 +450,7 @@ Central orchestration service.
 Current responsibilities:
 - validate the incoming task
 - stop invalid task execution
+- include validation errors in `OrchestrationResult.errors`
 - route valid tasks
 - execute selected agents sequentially
 - maintain a progressively enriched `ExecutionContext`
@@ -467,6 +504,100 @@ Current responsibility:
 - return trimmed prompt content for injection into agents
 
 
+## Tests
+
+### `src/test/kotlin/org/dcac/fakes/FakeTasks.kt`
+
+Provides reusable fake orchestration tasks for unit tests.
+
+Current purpose:
+- create valid tasks
+- create invalid tasks with blank title
+- create invalid tasks with blank instruction
+- create invalid tasks with both title and instruction blank
+
+
+### `src/test/kotlin/org/dcac/fakes/FakeLlmClient.kt`
+
+Provides a fake `LlmClient` implementation for agent tests.
+
+Current purpose:
+- simulate successful LLM responses
+- simulate LLM client failures
+- test agents without calling real Ollama models
+
+
+### `src/test/kotlin/org/dcac/fakes/FakeAgent.kt`
+
+Provides a fake `Agent` implementation for orchestrator tests.
+
+Current purpose:
+- simulate successful agents
+- simulate failed agents
+- count agent executions
+- inspect the `ExecutionContext` received by downstream agents
+
+
+### `src/test/kotlin/org/dcac/tasks/TaskValidatorTest.kt`
+
+Tests task validation behavior.
+
+Current coverage:
+- blank title returns a validation error
+- blank instruction returns a validation error
+- blank title and instruction return both validation errors
+- valid task returns no validation errors
+
+
+### `src/test/kotlin/org/dcac/agents/ManagerAgentTest.kt`
+
+Tests manager agent behavior.
+
+Current coverage:
+- supports valid tasks
+- returns successful `AgentResult` when the LLM client succeeds
+- returns failed `AgentResult` when the LLM client fails
+- returns fallback error message when the exception has no message
+
+
+### `src/test/kotlin/org/dcac/agents/CodeAgentTest.kt`
+
+Tests code agent behavior.
+
+Current coverage:
+- supports code tasks
+- rejects unsupported review-only task types
+- returns successful `AgentResult` when the LLM client succeeds
+- succeeds even when the manager plan is missing
+- returns failed `AgentResult` when the LLM client fails
+- returns fallback error message when the exception has no message
+
+
+### `src/test/kotlin/org/dcac/agents/ReviewAgentTest.kt`
+
+Tests review agent behavior.
+
+Current coverage:
+- supports review tasks
+- rejects unsupported documentation task types
+- returns successful `AgentResult` when the LLM client succeeds
+- succeeds even when previous outputs are missing
+- returns failed `AgentResult` when the LLM client fails
+- returns fallback error message when the exception has no message
+
+
+### `src/test/kotlin/org/dcac/orchestrator/AiOrchestratorTest.kt`
+
+Tests central orchestration behavior.
+
+Current coverage:
+- invalid tasks return validation errors
+- invalid tasks do not execute agents
+- successful agents produce a successful `OrchestrationResult`
+- failed agents produce an unsuccessful `OrchestrationResult`
+- previous agent outputs are made available to downstream agents through `ExecutionContext.agentOutputs`
+
+
 ## 5. Current Status
 
 Implemented:
@@ -483,6 +614,9 @@ Implemented:
 - Kotlinx Serialization integration
 - Ollama request and response DTOs
 - actual model confirmation from Ollama responses
+- structured LLM client exception handling with `LlmClientException`
+- agent-level failure handling with `AgentResult.errorMessage`
+- orchestration-level validation errors through `OrchestrationResult.errors`
 - prompt loading through `PromptLoader`
 - externalized agent prompts in `src/main/resources/prompts`
 - real Mistral planning response generation
@@ -490,6 +624,10 @@ Implemented:
 - real DeepSeek review response generation
 - enriched agent result aggregation
 - readable console output with agent metadata
+- JVM unit test structure under `src/test/kotlin`
+- fake test utilities for tasks, LLM clients, and agents
+- unit tests for validators, agents, and orchestrator behavior
+- successful Gradle test execution
 - successful end-to-end local execution
 
 Current limitations:
@@ -498,20 +636,20 @@ Current limitations:
 - task classification is not connected
 - configuration is not loaded dynamically from `application.properties`
 - generated code is not written to files
-- errors are not isolated per agent
-- automated tests are not implemented
+- retry and fallback strategies are not implemented
+- client request timeouts are not configured
+- model availability is not checked before generation
+- client integration and end-to-end tests are not implemented
 - ComfyUI is not integrated into Kotlin
 - execution is sequential
 - final response synthesis is not implemented
 
 Planned next:
-1. Add structured client and agent error handling.
-2. Prevent full orchestration crashes when one agent fails.
-3. Return failed `AgentResult` entries with clear error messages.
-4. Add automated tests.
-5. Add final response synthesis.
-6. Wire `TaskClassifier` into the main workflow.
-7. Load Ollama configuration from `application.properties`.
-8. Add generated file support.
-9. Add ComfyUI integration.
-10. Add asynchronous or parallel execution where appropriate.
+1. Add final response synthesis.
+2. Load Ollama configuration from `application.properties`.
+3. Add retry, timeout, and fallback strategies.
+4. Check model availability before generation.
+5. Wire `TaskClassifier` into the main workflow.
+6. Add generated file support.
+7. Add ComfyUI integration.
+8. Add asynchronous or parallel execution where appropriate.

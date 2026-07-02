@@ -13,7 +13,7 @@ Each specialized agent has:
 - an externalized system prompt
 - access to the shared `LlmClient`
 - access to the shared `ExecutionContext`
-- a standardized `AgentResult` output
+- a standardized `AgentResult` output with success or failure metadata
 
 The current text-based agents are:
 - `ManagerAgent`
@@ -65,7 +65,14 @@ Current properties:
 - `model` → contains the actual model confirmed by the LLM backend
 - `success` → indicates whether the agent execution succeeded
 - `output` → contains the generated model response
-- `errorMessage` → optional error details for future failure handling
+- `errorMessage` → optional error details when agent execution fails
+
+If an agent fails during execution, it returns:
+- `success = false`
+- an empty `output`
+- a populated `errorMessage`
+
+This prevents one agent failure from directly crashing the full orchestration workflow.
 
 Every current agent returns an `AgentResult`.
 `AiOrchestrator` collects these objects and stores them inside the final `OrchestrationResult`.
@@ -103,6 +110,7 @@ Its system prompt asks the model to:
 
 `ManagerAgent` receives the original user instruction and sends it to Mistral through `LlmClient.generate()`.
 It returns the generated planning response inside an `AgentResult`.
+If the LLM client fails, `ManagerAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
 Its output is stored by `AiOrchestrator` in:
 ExecutionContext.agentOutputs["manager"]
@@ -120,6 +128,7 @@ Possible future responsibilities:
 - execution supervision
 - workflow adaptation
 - final response synthesis
+- structured planning output
 
 
 ### `CodeAgent`
@@ -148,6 +157,7 @@ Its system prompt asks the model to:
 
 It sends an enriched prompt to Qwen through `LlmClient.generate()`.
 It returns the generated implementation inside an `AgentResult`.
+If the LLM client fails, `CodeAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
 Its output is stored by `AiOrchestrator` in:
 ExecutionContext.agentOutputs["code"]
@@ -167,6 +177,7 @@ Possible future responsibilities:
 - generate tests
 - refactor existing code
 - return structured generated artifacts
+- structured code generation output
 
 
 ### `ReviewAgent`
@@ -196,6 +207,7 @@ Its system prompt asks the model to:
 
 It sends an enriched review prompt to DeepSeek through `LlmClient.generate()`.
 It returns the generated review inside an `AgentResult`.
+If the LLM client fails, `ReviewAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
 Current capabilities:
 - real local code review
@@ -211,6 +223,7 @@ Possible future responsibilities:
 - validate architecture decisions
 - approve or reject generated artifacts
 - trigger a correction loop with CodeAgent
+- structured error and severity reporting
 
 
 ## ⚙️ Current Agent Workflow
@@ -227,7 +240,8 @@ For a `TaskType.CODE` task, the current workflow is:
 9. `ReviewAgent` receives the original instruction, the manager plan, and the generated code.
 10. `ReviewAgent` reviews the generated code.
 11. Each agent returns an enriched `AgentResult`.
-12. The results are aggregated into an `OrchestrationResult`.
+12. If an agent fails, it returns a failed `AgentResult` instead of crashing the application.
+13. The results are aggregated into an `OrchestrationResult`.
 
 The current workflow produces real local model responses and supports data sharing between agents through `ExecutionContext.agentOutputs`.
 

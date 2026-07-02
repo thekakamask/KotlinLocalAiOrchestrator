@@ -75,6 +75,12 @@ fun main() {
     // Print the orchestration result to the console.
     println("Task: ${result.taskId}")
     println("Success: ${result.success}")
+    if (result.errors.isNotEmpty()) {
+        println("Errors:")
+        result.errors.forEach { error ->
+            println("- $error")
+        }
+    }
 
     result.results.forEach { agentResult ->
         println()

@@ -22,52 +22,38 @@ class ManagerAgent(
     // Stable identifier used by the orchestrator and final results.
     override val id: String = "manager"
 
-    /*// System prompt defining the role and behavior of the manager agent.
-    private val systemPrompt: String = """
-        You are the manager agent of a local offline AI orchestrator.
-        Your role is to understand the user request, organize the work, and produce a clear execution plan for specialized agents.
-
-        You are a planner, not an implementer.
-
-        Strict rules:
-        - do not generate final source code
-        - do not write code snippets
-        - do not include Markdown code blocks
-        - do not implement the requested feature yourself
-        - do not provide imports, classes, functions, or executable examples
-
-        Your response must focus only on:
-        - the goal of the task
-        - the expected output
-        - the recommended implementation steps
-        - important constraints
-        - risks or points that the code agent should pay attention to
-
-        The code agent will generate the implementation after you.
-        The review agent will review the generated implementation after that.
-        """.trimIndent()
-*/
-
     // The manager currently supports every task type because it coordinates the workflow.
     override fun supports(task: OrchestrationTask): Boolean = true
 
     // Execute the manager step for the given task.
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
-        // Ask the configured local LLM model to generate the manager response.
-        val llmResponse = llmClient.generate(
-            model = model,
-            systemPrompt = systemPrompt,
-            userPrompt = task.instruction
-        )
+        return try {
+            // Ask the configured local LLM model to generate the manager response.
+            val llmResponse = llmClient.generate(
+                model = model,
+                systemPrompt = systemPrompt,
+                userPrompt = task.instruction
+            )
 
-        // Return the manager output in the standard AgentResult format.
-        return AgentResult(
-            agentId = id,
-            role = "Planning and coordination agent",
-            model = llmResponse.actualModel,
-            success = true,
-            output = llmResponse.text
-        )
+            // Return the manager output in the standard AgentResult format.
+            AgentResult(
+                agentId = id,
+                role = "Planning and coordination agent",
+                model = llmResponse.actualModel,
+                success = true,
+                output = llmResponse.text
+            )
+        } catch (exception : Exception) {
+            // Return a failed result instead of crashing the full orchestration workflow.
+            AgentResult(
+                agentId = id,
+                role = "Planning and coordination agent",
+                model = model,
+                success = false,
+                output = "",
+                errorMessage = exception.message ?: "Unknown manager agent error"
+            )
+        }
     }
 }
 

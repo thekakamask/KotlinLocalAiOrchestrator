@@ -9,6 +9,7 @@ The current implementation connects the application to the local Ollama HTTP API
 This package currently contains:
 - `LlmClient` → common contract for language model backends
 - `LlmResponse` → structured response returned by language model clients
+- `LlmClientException` → structured exception used for LLM backend client failures
 - `OllamaClient` → working local Ollama HTTP implementation
 - `OllamaGenerateRequest` → request DTO sent to Ollama
 - `OllamaGenerateResponse` → response DTO received from Ollama
@@ -71,6 +72,25 @@ Agents use `LlmResponse.actualModel` when building their `AgentResult`.
 This means the console output displays the model confirmed by the backend instead of only displaying the model string configured in the agent.
 
 
+### `LlmClientException`
+
+`LlmClientException` represents failures produced by LLM backend clients.
+Its purpose is to distinguish LLM-specific client failures from generic runtime errors.
+
+It is used when:
+- Ollama returns a non-successful HTTP response
+- the HTTP request fails
+- the response cannot be decoded correctly
+- an unexpected client-side error occurs during generation
+
+Current properties:
+- `message` → human-readable error description
+- `cause` → optional original exception that caused the failure
+
+`OllamaClient` throws this exception when generation fails.
+Agents catch this exception through their execution error handling and convert it into a failed `AgentResult`.
+
+
 ### `OllamaClient`
 
 `OllamaClient` is the current implementation of `LlmClient`.
@@ -91,6 +111,7 @@ Current responsibilities:
 - send an HTTP POST request to Ollama
 - validate the HTTP status code
 - deserialize the Ollama JSON response
+- convert HTTP, network, JSON parsing, and unexpected client errors into `LlmClientException`
 - create a structured `LlmResponse`
 - return the requested model, actual model, and generated text
 
@@ -99,9 +120,11 @@ The current request is configured with:
 
 This configuration instructs Ollama to return one complete JSON response instead of multiple streamed JSON fragments.
 
-If Ollama returns a non-successful HTTP status, `OllamaClient` stops execution and throws an error containing:
+If Ollama returns a non-successful HTTP status, `OllamaClient` throws an `LlmClientException` containing:
 - the HTTP status code
 - the response body returned by Ollama
+
+Unexpected network, JSON parsing, or client-side failures are also wrapped into `LlmClientException`.
 
 The current implementation is shared by all text-based agents.
 `App.kt` creates one `OllamaClient` instance and injects it into `ManagerAgent`, `CodeAgent`, and `ReviewAgent`.
@@ -160,9 +183,11 @@ The current client workflow is:
 5. Ollama executes the selected local model.
 6. Ollama returns one complete JSON response.
 7. Kotlinx Serialization converts the JSON into `OllamaGenerateResponse`.
-8. `OllamaClient` creates an `LlmResponse`.
-9. The agent reads `LlmResponse.actualModel` and `LlmResponse.text`.
-10. The agent stores these values inside an enriched `AgentResult`.
+8. If the request or response handling fails, `OllamaClient` throws an `LlmClientException`.
+9. If generation succeeds, `OllamaClient` creates an `LlmResponse`.
+10. The agent reads `LlmResponse.actualModel` and `LlmResponse.text`.
+11. The agent stores these values inside an enriched `AgentResult`.
+12. If the client throws an exception, the agent catches it and returns a failed `AgentResult`.
 
 
 ## ⚠️ Current Limitations
@@ -171,14 +196,14 @@ The current client integration successfully generates local model responses, but
 - HTTP requests are synchronous and blocking
 - request timeout configuration is not implemented
 - retry strategies are not implemented
-- connection failure handling is limited
+- connection failures are wrapped into `LlmClientException`, but retry and fallback strategies are not implemented
 - model availability is not checked before generation
 - streaming responses are not supported
 - cancellation is not supported
 - token usage is not stored
 - execution duration is not stored
 - detailed Ollama metadata is ignored
-- client errors currently propagate and can stop the complete workflow
+- client errors are converted into failed agent results, but advanced recovery strategies are not implemented
 - configuration is not yet loaded dynamically from `application.properties`
 
 
@@ -194,8 +219,8 @@ Possible future improvements:
 - support request cancellation
 - return richer generation metadata
 - record token usage and execution duration
-- improve exception types and error messages
-- isolate client failures at agent level
+- enrich `LlmClientException` with structured error codes
+- improve client failure diagnostics
 - load the base URL from `application.properties`
 - add test and fake client implementations
 - add a `ComfyUiClient` for image and video workflows

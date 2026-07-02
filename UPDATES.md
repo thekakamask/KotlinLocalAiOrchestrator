@@ -242,5 +242,53 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - Generated code is still displayed in the console and not written to files automatically
 
 
+### 🔹 **Update #5**
+
+  - ⚠️ **Structured error handling improvements**
+    - Added `LlmClientException` to represent failures from LLM backend clients
+    - Updated `OllamaClient` to convert HTTP, network, JSON parsing, and unexpected client errors into structured `LlmClientException` errors
+    - Replaced generic client failures with clearer LLM-specific exception handling
+    - Added agent-level error handling so agents can return failed `AgentResult` entries instead of crashing the full orchestration workflow
+    - Updated `ManagerAgent`, `CodeAgent`, and `ReviewAgent` to return `success = false` with clear `errorMessage` values when execution fails
+
+  - 📦 **Orchestration-level validation error reporting**
+    - Extended `OrchestrationResult` with an `errors` field for validation and orchestration-level failures
+    - Updated `AiOrchestrator` to include validation errors in `OrchestrationResult.errors`
+    - Preserved empty agent results when validation fails before execution
+    - Updated console output to display orchestration-level errors separately from agent-level errors
+    - Clarified the distinction between validation errors and agent execution errors
+
+  - ✅ **Unit test foundation**
+    - Added JVM unit test structure under `src/test/kotlin`
+    - Added reusable fake test data with `FakeTasks`
+    - Added `FakeLlmClient` to test agents without calling real Ollama models
+    - Added `FakeAgent` to test orchestrator behavior without real agent implementations
+    - Added `TaskValidatorTest` to validate task error handling
+    - Added `ManagerAgentTest`, `CodeAgentTest`, and `ReviewAgentTest` to verify agent success and failure behavior
+    - Added `AiOrchestratorTest` to verify validation failure handling, global success aggregation, agent failure aggregation, and context sharing between agents
+
+  - 🧪 **Tested scenarios**
+    - Verified that blank task titles return validation errors
+    - Verified that blank task instructions return validation errors
+    - Verified that invalid tasks stop before agent execution
+    - Verified that successful agents return enriched `AgentResult` values
+    - Verified that client failures are converted into failed agent results
+    - Verified that missing exception messages fall back to agent-specific default error messages
+    - Verified that one failed agent makes the final `OrchestrationResult.success` value false
+    - Verified that agent outputs are shared through `ExecutionContext.agentOutputs`
+
+  - ✅ **Build and test validation**
+    - Ran the JVM test suite successfully with Gradle
+    - Confirmed that all current unit tests pass
+    - Confirmed that the project still compiles after error-handling and test additions
+
+  - ⚠️ **Current workflow limitations**
+    - Error handling is improved but retry and fallback strategies are not implemented yet
+    - Client request timeouts are not configured yet
+    - Model availability is not checked before generation
+    - Final response synthesis is not implemented yet
+    - Generated code is still displayed in the console and not written to files automatically
+
+
 ## 🤝 **Contributions**
 Contributions are welcome! Feel free to fork the repository and submit a pull request for new features or bug fixes✅🟩❌.
