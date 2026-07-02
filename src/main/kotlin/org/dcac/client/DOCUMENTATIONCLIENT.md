@@ -222,7 +222,7 @@ Possible future improvements:
 - enrich `LlmClientException` with structured error codes
 - improve client failure diagnostics
 - load the base URL from `application.properties`
-- add test and fake client implementations
+- expand fake client implementations for more client failure scenarios
 - add a `ComfyUiClient` for image and video workflows
 - support multiple local or remote providers
 

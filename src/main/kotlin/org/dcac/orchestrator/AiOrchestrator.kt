@@ -8,6 +8,7 @@ import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationResult
 // Import the task type handled by the orchestrator.
 import org.dcac.models.OrchestrationTask
+import org.dcac.synthesis.ResponseSynthesizer
 // Import the component responsible for selecting agents for a task.
 import org.dcac.tasks.TaskRouter
 // Import the component responsible for validating tasks before execution.
@@ -22,7 +23,9 @@ class AiOrchestrator(
     // Router used to decide which agents should run for a given task.
     private val router: TaskRouter,
     // Validator used to reject invalid tasks before starting execution.
-    private val validator: TaskValidator
+    private val validator: TaskValidator,
+    // Synthesizer used to build the final user-facing response from agent results.
+    private val responseSynthesizer: ResponseSynthesizer
 ) {
     // Execute one orchestration task with the provided runtime context.
     fun execute(task: OrchestrationTask, context: ExecutionContext): OrchestrationResult {
@@ -38,7 +41,10 @@ class AiOrchestrator(
                 success = false,
                 // No agent result exists because execution stopped during validation.
                 results = emptyList(),
-                errors = errors
+                // Store validation errors at orchestration level.
+                errors = errors,
+                // Store a final user-facing response explaining why execution stopped.
+                finalResponse = "The task could not be executed because validation failed."
             )
         }
 
@@ -65,6 +71,9 @@ class AiOrchestrator(
             )
         }
 
+        // Build the final user-facing response from all agent results.
+        val finalResponse = responseSynthesizer.synthesize(task, results)
+
         // Return the final orchestration result after all selected agents have run.
         return OrchestrationResult(
             // Keep the original task id in the final result.
@@ -72,7 +81,9 @@ class AiOrchestrator(
             // Mark the orchestration as successful only if every agent succeeded.
             success = results.all { it.success },
             // Store every result returned by the selected agents.
-            results = results
+            results = results,
+            // Store the final synthesized response built from agent outputs.
+            finalResponse = finalResponse
         )
     }
 }

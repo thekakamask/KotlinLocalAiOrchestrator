@@ -82,7 +82,7 @@ Possible future improvements:
 - load balancing
 - specialized workflow branches
 - selecting only one agent when appropriate
-- routing based on previous agent results
+- routing based on previous agent results or workflow state
 
 Its purpose is to keep agent selection independent from the central orchestrator.
 
@@ -137,4 +137,4 @@ The current task preparation flow is:
 Task validation behavior is covered by JVM unit tests in `TaskValidatorTest`.
 
 The future flow will automatically classify the user instruction before validation and routing:
-User instruction → classification → validation → routing → chained agent execution
+User instruction → classification → validation → routing → chained agent execution → final response synthesis

@@ -14,6 +14,7 @@ This package connects:
 - agent failure aggregation
 - result aggregation
 - global success evaluation
+- final response synthesis
 
 The `orchestrator` does not generate AI responses directly. It coordinates the components responsible for processing the task.
 The package currently contains the `AiOrchestrator` class.
@@ -26,9 +27,10 @@ The package currently contains the `AiOrchestrator` class.
 `AiOrchestrator` is the main execution service of the application.
 Its role is to coordinate every step required to process an `OrchestrationTask`.
 
-The class receives two dependencies:
+The class receives three dependencies:
 - `TaskValidator` → verifies that the task is valid
 - `TaskRouter` → selects the agents compatible with the task
+- `ResponseSynthesizer` → builds the final user-facing response from agent results
 
 Its main function is `execute()`.
 
@@ -41,6 +43,7 @@ It returns an `OrchestrationResult` containing:
 - the global success status
 - the results returned by the selected agents
 - validation or orchestration-level errors
+- the synthesized final response
 
 Current responsibilities:
 - receive a task and its execution context
@@ -55,6 +58,8 @@ Current responsibilities:
 - collect every `AgentResult`
 - aggregate failed agent results without crashing the orchestration result
 - calculate the global success status
+- build a synthesized final response with `ResponseSynthesizer`
+- store the synthesized response in `OrchestrationResult.finalResponse`
 - build and return the final `OrchestrationResult`
 
 Its purpose is to keep coordination logic separate from task preparation, agent behavior, and external API communication.
@@ -76,6 +81,8 @@ The current orchestration workflow follows these steps:
 11. Each agent returns an enriched `AgentResult`.
 12. If an agent fails, it returns a failed `AgentResult` with an `errorMessage`.
 13. All agent results are grouped into an `OrchestrationResult`.
+14. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+15. The synthesized response is stored in `OrchestrationResult.finalResponse`.
 
 For the current `TaskType.CODE` example, the selected agents are:
 - `ManagerAgent`
@@ -114,6 +121,8 @@ After agent execution, `AiOrchestrator` collects every returned `AgentResult`.
 
 The global success status is calculated using all individual results.
 The orchestration succeeds only when validation succeeds and every selected agent returns `success = true`.
+After aggregation, `ResponseSynthesizer` builds a final user-facing response from the collected agent results.
+This response is stored in `OrchestrationResult.finalResponse`.
 
 Each `AgentResult` may contain:
 - the agent identifier
@@ -150,8 +159,7 @@ Current limitations:
 - the manager creates a plan but does not yet dynamically decide which agents should run
 - `TaskRouter` still controls agent selection through static support rules
 - agent exceptions are converted into failed `AgentResult` entries, but retry and fallback strategies are not implemented
-- retry and fallback strategies are not implemented
-- final response synthesis is not implemented
+- final response synthesis is implemented, but it is currently deterministic and may duplicate detailed agent content
 - workflow state is not persisted
 - execution metrics are not collected
 - generated code is not written to files automatically
@@ -164,8 +172,7 @@ Possible future improvements:
 - decompose complex requests into subtasks
 - let the manager recommend which agents should run
 - add real manager-agent supervision
-- synthesize a single final response
-- add retry and fallback strategies for failed agents
+- improve final response formatting and reduce duplicated agent content
 - execute independent agents in parallel
 - use Kotlin coroutines
 - track workflow state

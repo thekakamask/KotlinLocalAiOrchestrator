@@ -108,6 +108,7 @@ Current properties:
 - `success` → is `true` only when validation succeeds and every selected agent reports success
 - `results` → contains the enriched `AgentResult` returned by each selected agent
 - `errors` → contains validation or orchestration-level errors that are not tied to a specific agent
+- `finalResponse` → contains the synthesized user-facing response built from agent results
 
 The current execution flow creates one `AgentResult` per selected agent when execution reaches the agent workflow.
 These results are then stored inside the final `OrchestrationResult`.
@@ -119,7 +120,7 @@ Possible future properties:
 - workflow diagnostics
 - execution duration
 - workflow-level diagnostics
-- final synthesized response
+- structured final response sections
 - generated artifact references
 
 Its purpose is to provide a unified view of the complete orchestration execution.

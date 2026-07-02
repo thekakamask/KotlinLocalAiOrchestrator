@@ -17,6 +17,8 @@ data class OrchestrationResult(
     // Collection of results returned by each selected agent.
     val results: List<AgentResult>,
     // Validation or orchestration-level errors that are not tied to a specific agent.
-    val errors: List<String> = emptyList()
+    val errors: List<String> = emptyList(),
+    // Final user-facing response synthesized from agent results.
+    val finalResponse: String? = null
 )
 

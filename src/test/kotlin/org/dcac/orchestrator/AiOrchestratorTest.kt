@@ -3,6 +3,7 @@ package org.dcac.orchestrator
 import org.dcac.fakeData.FakeAgent
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.ExecutionContext
+import org.dcac.synthesis.ResponseSynthesizer
 import org.dcac.tasks.TaskRouter
 import org.dcac.tasks.TaskValidator
 import kotlin.test.Test
@@ -18,7 +19,8 @@ class AiOrchestratorTest {
 
         val orchestrator = AiOrchestrator(
             router = TaskRouter(agents = listOf(fakeAgent)),
-            validator = TaskValidator()
+            validator = TaskValidator(),
+            responseSynthesizer = ResponseSynthesizer()
         )
 
         val result = orchestrator.execute(
@@ -51,7 +53,8 @@ class AiOrchestratorTest {
 
         val orchestrator = AiOrchestrator(
             router = TaskRouter(agents = listOf(firstAgent, secondAgent)),
-            validator = TaskValidator()
+            validator = TaskValidator(),
+            responseSynthesizer = ResponseSynthesizer()
         )
 
         val result = orchestrator.execute(
@@ -84,7 +87,8 @@ class AiOrchestratorTest {
 
         val orchestrator = AiOrchestrator(
             router = TaskRouter(agents = listOf(successfulAgent, failingAgent)),
-            validator = TaskValidator()
+            validator = TaskValidator(),
+            responseSynthesizer = ResponseSynthesizer()
         )
 
         val result = orchestrator.execute(
@@ -119,7 +123,8 @@ class AiOrchestratorTest {
 
         val orchestrator = AiOrchestrator(
             router = TaskRouter(agents = listOf(firstAgent, secondAgent)),
-            validator = TaskValidator()
+            validator = TaskValidator(),
+            responseSynthesizer = ResponseSynthesizer()
         )
 
         val result = orchestrator.execute(

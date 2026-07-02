@@ -20,7 +20,9 @@ The architecture follows this execution flow:
 10. `OllamaClient` serializes requests, sends them to local models, and converts client failures into `LlmClientException`.
 11. Each agent returns an enriched `AgentResult`, including success or failure metadata.
 12. The orchestrator aggregates all results and validation errors into an `OrchestrationResult`.
-13. The application displays orchestration-level errors and agent responses separately.
+13. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+14. The final response is stored in `OrchestrationResult.finalResponse`.
+15. The application displays the final response first, then separated developer details.
 
 The current workflow runs entirely on the local machine.
 
@@ -66,7 +68,9 @@ The current execution flow is:
 20. If an agent fails, it returns an `AgentResult` with `success = false` and `errorMessage`.
 21. Each agent wraps its response into an enriched `AgentResult`.
 22. `AiOrchestrator` aggregates the results and errors into an `OrchestrationResult`.
-23. `App.kt` displays each response separately with agent metadata.
+23. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+24. `OrchestrationResult.finalResponse` stores the synthesized response.
+25. `App.kt` displays the final response first, then separated agent responses with metadata.
 
 For the current `TaskType.CODE` example, the execution order is:
 1. `ManagerAgent` using Mistral 7B
@@ -194,7 +198,8 @@ Current tested areas:
 - Creates a sample `OrchestrationTask`
 - Creates the `ExecutionContext`
 - Executes the orchestration workflow
-- Displays each `AgentResult` separately
+- Displays the synthesized final response
+- Displays separated developer details for each `AgentResult`
 - Displays orchestration-level validation errors
 
 
@@ -405,7 +410,10 @@ Current properties:
 - `success`
 - `results`
 - `errors`
+- `finalResponse`
 
+
+The `finalResponse` field stores the synthesized user-facing response built from agent results.
 The global success value is `true` only when validation succeeds and every selected agent reports success.
 The `errors` field stores validation or orchestration-level errors that are not tied to a specific agent.
 
@@ -457,6 +465,8 @@ Current responsibilities:
 - store each agent output in `ExecutionContext.agentOutputs`
 - collect enriched agent results
 - calculate global success
+- build a synthesized final response with `ResponseSynthesizer`
+- store the synthesized response in `OrchestrationResult.finalResponse`
 - return an `OrchestrationResult`
 
 
@@ -642,10 +652,10 @@ Current limitations:
 - client integration and end-to-end tests are not implemented
 - ComfyUI is not integrated into Kotlin
 - execution is sequential
-- final response synthesis is not implemented
+- final response synthesis is implemented, but it is currently deterministic and may duplicate detailed agent content
 
 Planned next:
-1. Add final response synthesis.
+1. Improve final response formatting and reduce duplicated agent content.
 2. Load Ollama configuration from `application.properties`.
 3. Add retry, timeout, and fallback strategies.
 4. Check model availability before generation.

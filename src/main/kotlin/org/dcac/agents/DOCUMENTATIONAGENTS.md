@@ -127,7 +127,7 @@ Possible future responsibilities:
 - agent selection recommendations
 - execution supervision
 - workflow adaptation
-- final response synthesis
+- provide structured planning data for final response synthesis
 - structured planning output
 
 
@@ -242,6 +242,7 @@ For a `TaskType.CODE` task, the current workflow is:
 11. Each agent returns an enriched `AgentResult`.
 12. If an agent fails, it returns a failed `AgentResult` instead of crashing the application.
 13. The results are aggregated into an `OrchestrationResult`.
+14. The collected agent results can then be used by `ResponseSynthesizer` to build the final user-facing response.
 
 The current workflow produces real local model responses and supports data sharing between agents through `ExecutionContext.agentOutputs`.
 
