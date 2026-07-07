@@ -334,6 +334,89 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
     - Generated code is still displayed in the console and not written to files automatically
     - Final response formatting is still console-oriented and may evolve for a future UI or API
+  
+
+### 🔹 **Update #7**
+
+  - 🧭 **Planning workflow introduction**
+    - Introduced a new planning-oriented workflow before agent execution
+    - Added `PlanningAgent` to analyze the user instruction and select the appropriate workflow
+    - Replaced the previous always-on manager workflow with a lighter planning decision step
+    - Added `PlanningDecision` to parse structured planning output from the local LLM
+    - Added a dedicated `planning.txt` prompt for workflow selection
+    - Removed `manager.txt` from the active prompt workflow
+    - Kept the previous manager-oriented architecture as a legacy direction rather than the default runtime path
+
+  - 🧩 **Workflow model foundation**
+    - Added `WorkflowType` to represent the selected execution strategy
+    - Added `TaskComplexity` to estimate whether a request is simple, moderate, or complex
+    - Added `WorkflowPlan` to carry the selected workflow, complexity, planned agents, and planning reason
+    - Started moving away from `TaskType` as the primary routing mechanism
+    - Updated `OrchestrationTask` so task routing can be inferred from the user instruction instead of being manually selected
+    - Prepared the architecture for future automatic workflow selection from natural language user requests
+
+  - 🔀 **Deterministic workflow planning**
+    - Added `WorkflowPlanner` to complete the LLM planning decision with a deterministic agent pipeline
+    - Mapped workflow types to ordered agent identifiers
+    - Added support for workflows such as:
+      - `CODE_ONLY`
+      - `CODE_REVIEW`
+      - `CODE_REVIEW_TEST`
+      - `CODE_REVIEW_DOCUMENTATION`
+      - `CODE_REVIEW_TEST_DOCUMENTATION`
+      - `REVIEW_ONLY`
+      - `DOCUMENTATION_ONLY`
+      - `GENERAL`
+    - Kept unsupported future agents, such as test and documentation agents, out of the active runtime pipeline until implemented
+    - Preserved deterministic control over which agents are executed after planning
+
+  - 🎛️ **Orchestrator workflow refactor**
+    - Updated `AiOrchestrator` to run validation, planning, workflow completion, routing, agent execution, and synthesis in order
+    - Integrated `PlanningAgent` and `WorkflowPlanner` into the orchestration flow
+    - Updated agent routing so `TaskRouter` can select agents by planned agent identifiers
+    - Reduced dependency on static task-type based routing
+    - Added workflow observability logs for selected workflow, complexity, planning reason, and selected agents
+
+  - ⏱️ **Runtime progress and timing logs**
+    - Added `TimeUtils` utility support for formatting durations
+    - Added progress timers during planning and agent execution
+    - Displayed elapsed time while long-running local model calls are in progress
+    - Displayed per-agent execution duration after each agent completes
+    - Displayed total orchestration duration at the end of each task
+    - Improved developer visibility when local model inference takes several seconds or minutes
+
+  - 🧠 **Model allocation refinement**
+    - Tested larger and more specialized local models through Ollama
+    - Upgraded the code generation model from Qwen 2.5 Coder 7B to Qwen 2.5 Coder 14B
+    - Tested DeepSeek Coder V2 16B for review-oriented workflows
+    - Tested Qwen 3 8B and Qwen 3 14B for planning-oriented workflows
+    - Selected Qwen 3 8B as a better planning candidate due to faster response time for lightweight workflow decisions
+    - Confirmed GPU usage during Ollama inference through `nvidia-smi`
+
+  - 📝 **Prompt strategy improvements**
+    - Reworked the code agent prompt to generate valid, idiomatic, implementation-ready code without excessive over-minimization
+    - Reworked the review agent prompt to better distinguish confirmed issues, optional improvements, speculative risks, and missing tests
+    - Added guardrails to avoid false Kotlin nullability warnings
+    - Added guardrails to avoid treating reasonable assumptions as confirmed issues
+    - Added planning prompt rules to prefer `CODE_REVIEW` as the default safety workflow for generated code
+    - Identified the need for future domain-specific prompts such as Room, ViewModel, UI, tests, and documentation prompts
+
+  - ✅ **Runtime validation**
+    - Verified successful execution of a simple Kotlin domain entity generation task
+    - Verified successful planning of a simple code request as `CODE_REVIEW`
+    - Verified successful execution of a more complex Room persistence request as `CODE_REVIEW` with `MODERATE` complexity
+    - Confirmed that planned agents are selected dynamically from the workflow plan
+    - Confirmed that final responses and developer details are still generated after the workflow refactor
+
+  - ⚠️ **Current workflow limitations**
+    - Planning is still performed by a local LLM and can be slow for simple requests
+    - The planning step may eventually be replaced or assisted by deterministic Kotlin classification for obvious workflows
+    - `TaskType` and `TaskClassifier` are being phased out but may still exist in the codebase during transition
+    - Test and documentation agents are not implemented yet
+    - Workflow types for tests and documentation currently prepare future routing but do not execute dedicated agents yet
+    - Prompt selection is still global and not yet specialized by technical domain
+    - Room-specific code generation and review still need specialized prompts to catch framework-specific issues
+    - Generated code is still displayed in the console and not written to project files automatically
 
 
 ## 🤝 **Contributions**

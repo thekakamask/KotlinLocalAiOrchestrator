@@ -2,25 +2,43 @@
 
 ## 📌 Summary
 
-The `tasks` package prepares orchestration tasks before agents execute them.
+The `tasks` package prepares orchestration tasks and resolves planned agents before execution.
 
-Its responsibilities are divided into three operations:
-- classification with `TaskClassifier`
+Its current responsibilities are divided into two active operations:
 - validation with `TaskValidator`
-- agent selection with `TaskRouter`
+- planned agent resolution with `TaskRouter`
 
-This package separates task preparation and routing rules from agent implementation and orchestration logic.
-At the current stage, validation and routing are integrated into the main workflow. Classification exists but is not yet connected to `App.kt` or `AiOrchestrator`.
+It also contains transitional classification support:
+- legacy / transitional classification with `TaskClassifier`
+
+This package separates task validation and agent resolution rules from agent implementation and orchestration logic.
+
+At the current stage, validation and planned-agent routing are integrated into the main workflow.
+Classification exists as transitional code but is no longer the main workflow decision mechanism.
+Workflow selection is currently handled by `PlanningAgent` and `WorkflowPlanner`.
 
 
 ## 🧩 Classes Description
 
 ### `TaskClassifier`
 
-`TaskClassifier` determines a `TaskType` from a user instruction.
-It currently uses a lightweight keyword-based strategy. The instruction is converted to lowercase and checked for known words.
+`TaskClassifier` is a transitional keyword-based component that determines a `TaskType` from a user instruction.
+It was created for the earlier task-type based routing workflow.
 
-Current classification rules:
+The active workflow is now moving toward planning-based workflow selection using:
+- `PlanningAgent`
+- `WorkflowType`
+- `TaskComplexity`
+- `WorkflowPlan`
+- `WorkflowPlanner`
+
+Current status:
+- implemented
+- transitional
+- not the main workflow decision mechanism
+- may still exist while the architecture is being refactored
+
+Previous classification rules included:
 - `review` or `audit` → `TaskType.REVIEW`
 - `test` → `TaskType.TEST`
 - `doc` → `TaskType.DOCUMENTATION`
@@ -29,67 +47,69 @@ Current classification rules:
 - `code` or `implement` → `TaskType.CODE`
 - no recognized keyword → `TaskType.GENERAL`
 
-The order of these checks is important. The first matching rule determines the returned task type.
-`TaskClassifier` is currently implemented but is not connected to the main workflow. In `App.kt`, the task type is still assigned manually when the `OrchestrationTask` is created.
+Possible future outcomes:
+- remove it completely
+- keep it as a deterministic fast-path planner
+- reuse it as a fallback when the planning model fails
+- reuse it as a cheap pre-classification signal before calling an LLM
+- combine keyword-based rules with workflow planning
 
-Possible future improvements:
-- connect classification to the application entry point
-- support more keywords and task categories
-- return a classification confidence score
-- detect multiple task types
-- use an LLM for semantic classification
-- combine rule-based and LLM-based classification
-- generate routing hints
-
-Its purpose is to automatically identify the nature of a user request before routing begins.
+Its original purpose was to automatically identify the nature of a user request before routing.
+Its future purpose is still undecided.
 
 
 ### `TaskRouter`
 
-`TaskRouter` selects the agents that should process an `OrchestrationTask`.
-It receives the list of available agents when it is created. For each task, it calls the `supports()` function of every registered agent.
-Agents returning `true` are included in the execution list.
+`TaskRouter` resolves planned agent identifiers into concrete agent instances.
 
-The current application registers:
-- `ManagerAgent`
+It receives the list of available agents when it is created.
+For each workflow execution, it receives ordered agent identifiers from `WorkflowPlan.agentIds`.
+
+The current application registers executable agents such as:
 - `CodeAgent`
 - `ReviewAgent`
 
-For a `TaskType.CODE` task:
-- `ManagerAgent` is selected because it currently supports every task
-- `CodeAgent` is selected because it supports code-related tasks
-- `ReviewAgent` is selected because it supports code and review-related tasks
+`PlanningAgent` is used before this executable pipeline and is not resolved by `TaskRouter` as a normal executable agent.
 
-The selected agents are returned in their registration order. `AiOrchestrator` executes them sequentially in that same order.
+Example workflow mappings are completed by `WorkflowPlanner` before routing:
+- `CODE_ONLY` → `code`
+- `CODE_REVIEW` → `code`, `review`
+- `REVIEW_ONLY` → `review`
+
+`TaskRouter` then maps those identifiers to registered agents by comparing them with `agent.id`.
+
+The selected agents are returned in the order requested by the workflow plan.
+`AiOrchestrator` executes them sequentially in that same order.
 
 This order is important because the current workflow shares data between agents through `ExecutionContext.agentOutputs`.
-For example, in a `TaskType.CODE` workflow:
-- `ManagerAgent` must run before `CodeAgent` so the code agent can use the manager plan
-- `CodeAgent` must run before `ReviewAgent` so the review agent can review the generated code
+
+For example, in a `CODE_REVIEW` workflow:
+- `CodeAgent` must run before `ReviewAgent`
+- `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`
+- `ReviewAgent` can then review the generated code
 
 Current routing responsibilities:
-- inspect every registered agent
-- call `supports(task)` on each agent
-- select all compatible agents
-- preserve agent registration order for chained execution
+- receive planned agent identifiers
+- find matching registered agents
+- preserve planned execution order
 - return the selected agent list to `AiOrchestrator`
 
 Possible future improvements:
-- priority-based routing
-- fallback agents
+- report unknown planned agent identifiers
+- fail fast when a required planned agent is missing
+- support optional agents
+- support fallback agents
 - dynamic agent registration
 - routing based on model availability
-- load balancing
-- specialized workflow branches
-- selecting only one agent when appropriate
-- routing based on previous agent results or workflow state
+- routing based on workflow state
+- routing based on prompt domain or artifact type
 
-Its purpose is to keep agent selection independent from the central orchestrator.
+Its purpose is to keep concrete agent resolution independent from the central orchestrator.
 
 
 ### `TaskValidator`
 
-`TaskValidator` verifies an `OrchestrationTask` before routing and execution begin.
+`TaskValidator` verifies an `OrchestrationTask` before planning and execution begin.
 
 It currently performs two validations:
 - the task title must not be blank
@@ -98,7 +118,8 @@ It currently performs two validations:
 The `validate()` function returns a list of error messages.
 If the list is empty, the task is considered valid.
 If the list contains errors, `AiOrchestrator` stops the workflow and returns an unsuccessful `OrchestrationResult` with the validation errors stored in `OrchestrationResult.errors`.
-No agent is executed when validation fails.
+
+No planning agent, executable agent, or Ollama model is called when validation fails.
 
 Current validation messages:
 - `title must not be blank`
@@ -108,7 +129,6 @@ These validation errors are exposed at orchestration level instead of being tied
 
 Possible future improvements:
 - validate the task identifier
-- validate supported task types
 - check instruction length
 - sanitize user input
 - validate project and target paths
@@ -117,24 +137,30 @@ Possible future improvements:
 - add security checks
 - replace plain string validation errors with structured validation error objects
 
-Its purpose is to prevent incomplete or invalid tasks from entering the agent execution workflow.
+Its purpose is to prevent incomplete or invalid tasks from entering the planning and agent execution workflow.
 
 
 ## 🔁 Current Tasks Workflow
 
-The current task preparation flow is:
-1. `App.kt` creates an `OrchestrationTask` with a manually assigned `TaskType`.
+The current task preparation and routing flow is:
+1. `App.kt` creates an `OrchestrationTask`.
 2. `AiOrchestrator` sends the task to `TaskValidator`.
-3. Invalid tasks stop before agent execution and their validation messages are returned in `OrchestrationResult.errors`.
-4. Valid tasks are passed to `TaskRouter`.
-5. `TaskRouter` checks every registered agent with `supports(task)`.
-6. Compatible agents are returned to `AiOrchestrator`.
-7. `AiOrchestrator` executes the selected agents sequentially in registration order.
-8. After each agent execution, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
-9. Downstream agents can use previous outputs if their implementation supports it.
+3. Invalid tasks stop before planning or agent execution.
+4. Validation messages are returned in `OrchestrationResult.errors`.
+5. Valid tasks are sent to `PlanningAgent`.
+6. `PlanningAgent` selects a workflow type, complexity level, and reason.
+7. `WorkflowPlanner` completes the workflow plan with ordered agent identifiers.
+8. `TaskRouter` resolves those identifiers into concrete registered agents.
+9. `AiOrchestrator` executes the selected agents sequentially in planned order.
+10. After each executable agent completes, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
+11. Downstream agents can use previous outputs if their implementation supports it.
+12. `ResponseSynthesizer` builds the final user-facing response.
 
-`TaskClassifier` is not yet part of this flow.
+`TaskClassifier` is not part of the active workflow decision path.
 Task validation behavior is covered by JVM unit tests in `TaskValidatorTest`.
 
-The future flow will automatically classify the user instruction before validation and routing:
-User instruction → classification → validation → routing → chained agent execution → final response synthesis
+The intended future flow is:
+User instruction → validation → planning → workflow completion → planned agent routing → agent execution → final response synthesis
+
+A possible future optimization is:
+User instruction → deterministic fast-path check → planning fallback when needed → workflow completion → planned agent routing → agent execution → final response synthesis

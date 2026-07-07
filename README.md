@@ -1,22 +1,30 @@
 # 🧠 **KotlinLocalAiOrchestrator**
-**KotlinLocalAiOrchestrator** is a modern fully offline multi-agent AI orchestration platform built in Kotlin.
-The goal of this project is to coordinate multiple specialized local AI models working together in concert in order to automate and accelerate software development workflows, technical architecture design, code generation, review, testing, documentation, image creation, and video generation.
 
-This platform is designed around a collaborative multi-agent architecture where each local AI model has a dedicated responsibility and works in concert with the others through a centralized orchestration workflow :
+**KotlinLocalAiOrchestrator** is a modern fully offline AI orchestration platform built in Kotlin.
 
-   - 🧠 **Mistral (Manager Agent)** → central orchestration, task decomposition, routing, workflow supervision, and result aggregation
-   - 💻 **Qwen (Code Agent)** → code generation, architecture proposals, test generation, and development assistance
-   - 🔍 **DeepSeek (Review Agent)** → code review, bug detection, performance analysis, optimization, and validation
-   - 🎨 **Juggernaut (Image Agent)** → image generation workflows, visual mockups, diagrams, and media automation
-   - 🎥 **Stable Video (Video Agent)** → local video generation workflows and media pipeline extensions
+The goal of this project is to coordinate specialized local AI models through a controllable orchestration workflow in order to automate and accelerate software development workflows such as code generation, code review, testing, documentation, architecture assistance, and future media generation.
 
-The current Kotlin implementation includes a working chained orchestration pipeline connected to Ollama. ManagerAgent produces an execution plan, CodeAgent generates the implementation from that plan, ReviewAgent reviews the generated code, and the orchestrator now builds a final synthesized response for the user.
+The current Kotlin implementation is centered around a planning-based workflow. A local planning model analyzes the user request and selects the appropriate workflow. A deterministic Kotlin `WorkflowPlanner` then resolves that workflow into an ordered agent pipeline, such as code generation only, code generation with review, or future code generation with tests and documentation.
 
-The entire ecosystem runs 100% locally and fully offline.
+The current active text-based workflow uses:
 
-   - ⚙️ **Ollama** → local LLM runtime used to host and execute text-based AI models such as Mistral, Qwen, and DeepSeek
-   - 🎨 **ComfyUI** → local visual workflow engine dedicated to image and video generation pipelines
-   - 🚀 **NVIDIA CUDA GPU (GTX 1080 Ti)** → hardware acceleration for both language models and generative media workflows
+   - 🧭 **Planning Agent** → analyzes the user instruction and selects the workflow type, complexity, and reason
+   - 🧩 **WorkflowPlanner** → deterministically maps the selected workflow to the agents that should run
+   - 💻 **Code Agent** → generates implementation-ready code
+   - 🔍 **Review Agent** → reviews generated code, identifies confirmed issues, optional improvements, risks, and missing tests
+
+Future extensions are planned for:
+
+   - 🧪 **Test Agent** → test generation and validation workflows
+   - 📝 **Documentation Agent** → documentation generation and improvement
+   - 🎨 **Image Agent** → image generation workflows, visual mockups, diagrams, and media automation
+   - 🎥 **Video Agent** → local video generation workflows and media pipeline extensions
+
+The entire ecosystem is designed to run locally and offline.
+
+   - ⚙️ **Ollama** → local LLM runtime used to host and execute text-based AI models
+   - 🎨 **ComfyUI** → local visual workflow engine planned for image and video generation pipelines
+   - 🚀 **NVIDIA CUDA GPU (GTX 1080 Ti)** → hardware acceleration for local model inference and generative media workflows
 
 
 ## 📚 **SUMMARY**
@@ -33,24 +41,32 @@ The entire ecosystem runs 100% locally and fully offline.
 
 ## ✅ **LAST MAJOR UPDATES (see [UPDATES.md](./UPDATES.md) for details)**
 
-   - Final response synthesis added to the orchestration output
-   - `OrchestrationResult` extended with `finalResponse`
-   - `ResponseSynthesizer` added to build a final user-facing response from agent results
-   - New `org.dcac.synthesis` package added
-   - `AiOrchestrator` now builds a final response after agent execution
-   - `App.kt` now displays `Final Response` before separated developer details
-   - Console output now distinguishes synthesized responses, agent metadata, model responses, and errors
-   - `FakeAgentResults` added for synthesis testing
-   - `ResponseSynthesizerTest` added for final response scenarios
-   - Full JVM test suite successfully executed with Gradle
+   - Added a planning-based orchestration step with `PlanningAgent`
+   - Added `planning.txt` as the dedicated prompt for workflow selection
+   - Added `WorkflowType`, `TaskComplexity`, and `WorkflowPlan`
+   - Added `WorkflowPlanner` to deterministically resolve workflow decisions into ordered agent pipelines
+   - Updated `AiOrchestrator` to run validation, planning, workflow completion, routing, agent execution, and synthesis
+   - Updated `TaskRouter` to select agents by planned agent identifiers
+   - Started moving away from manually selected `TaskType` routing
+   - Added runtime progress timers for planning and agent execution
+   - Added total orchestration duration and per-agent duration logs
+   - Tested larger local models through Ollama, including Qwen 2.5 Coder 14B, Qwen 3 8B/14B, and DeepSeek Coder V2 16B
+   - Confirmed local GPU usage during Ollama inference with `nvidia-smi`
+   - Improved planning, code, and review prompts with stronger workflow and review guardrails
 
 
 ## ❌ **NEXT UPDATES**
 
+   - Add domain-specific prompt selection with a `PromptSelector`
+   - Add specialized prompts for Room, ViewModel, UI, tests, documentation, and general code workflows
+   - Improve Room-specific code generation and review rules
+   - Add a deterministic fast-path planner for obvious workflow decisions
+   - Reduce planning latency for simple requests
+   - Add a future `TestAgent`
+   - Add a future `DocumentationAgent`
    - Improve final response formatting and reduce duplicated agent content
    - Add real file generation workflow
-   - Wire `TaskClassifier` into the main workflow
-   - Load Ollama model configuration from `application.properties`
+   - Load model configuration cleanly from `application.properties`
    - Improve client timeout handling and retry strategies
    - Check model availability before generation
    - Add ComfyUI client
@@ -61,7 +77,8 @@ The entire ecosystem runs 100% locally and fully offline.
 
    - 🧠 **AI orchestration pipeline**
       - 🟩 **IN PROGRESS** Multi-agent collaborative architecture
-      - 🟩 **IN PROGRESS** Task decomposition
+      - 🟩 **IN PROGRESS** Planning-based workflow selection
+      - 🟩 **IN PROGRESS** Deterministic workflow-to-agent routing
       - 🟩 **IN PROGRESS** Intelligent task routing
       - ❌ **PLANNED** Parallel execution
       - 🟩 **IN PROGRESS** Cross-agent validation
@@ -70,7 +87,8 @@ The entire ecosystem runs 100% locally and fully offline.
       - 🟩 **IN PROGRESS** Failure handling and error reporting
 
    - 🧩 **Specialized agent responsibilities**
-      - 🟩 **IN PROGRESS** Manager agent workflow supervision
+      - 🟩 **IN PROGRESS** Planning agent workflow selection
+      - 🟩 **IN PROGRESS** Workflow planner pipeline resolution
       - 🟩 **IN PROGRESS** Coding agent
       - 🟩 **IN PROGRESS** Review agent
       - ❌ **PLANNED** Testing agent
@@ -84,6 +102,7 @@ The entire ecosystem runs 100% locally and fully offline.
       - ❌ **PLANNED** Documentation generation
       - ❌ **PLANNED** Performance analysis
       - 🟩 **IN PROGRESS** Architecture design assistance
+      - ❌ **PLANNED** Domain-specific prompt selection
       - ❌ **PLANNED** Product ideation support
 
    - 🎨 **Generative media**
@@ -97,28 +116,31 @@ The entire ecosystem runs 100% locally and fully offline.
       - 🟩 **IN PROGRESS** No cloud dependency required
       - 🟩 **IN PROGRESS** Privacy-first architecture
       - 🟩 **IN PROGRESS** Local model interoperability
+      - 🟩 **IN PROGRESS** Local GPU-accelerated inference
 
    - 🧪 **Testing and reliability**
       - 🟩 **IN PROGRESS** Unit test foundation
       - 🟩 **IN PROGRESS** Task validation tests
       - 🟩 **IN PROGRESS** Agent success and failure tests
       - 🟩 **IN PROGRESS** Orchestrator aggregation tests
+      - 🟩 **IN PROGRESS** Final response synthesis tests
+      - ❌ **PLANNED** Workflow planning tests
       - ❌ **PLANNED** Client integration tests
       - ❌ **PLANNED** End-to-end workflow tests
-      - 🟩 **IN PROGRESS** Final response synthesis tests
-
+      
 
 ## 🛠️ **Tech Stack**
 
    - **Kotlin JVM** : Core orchestration engine
    - **Gradle Kotlin DSL** : Build system
    - **Ollama** : Local model runtime
-   - **Mistral 7B** : Manager / orchestration agent
-   - **Qwen 2.5 Coder 7B** : Coding and test agent
-   - **DeepSeek Coder 6.7B** : Review and performance agent
-   - **ComfyUI** : Media generation workflows
-   - **Juggernaut XL (SDXL)** : Image generation
-   - **Stable Video Diffusion XT** : Video generation
+   - **Qwen 3 8B** : Current planning model candidate
+   - **Qwen 2.5 Coder 14B** : Current code generation model candidate
+   - **DeepSeek Coder V2 16B** : Current review model candidate for deeper review workflows
+   - **Mistral 7B** : Previously used manager model, now legacy / optional
+   - **ComfyUI** : Planned media generation workflow engine
+   - **Juggernaut XL (SDXL)** : Planned image generation model
+   - **Stable Video Diffusion XT** : Planned video generation model
    - **NVIDIA CUDA GPU** : Local acceleration
    - **Java HttpClient** : HTTP communication with the local Ollama API
    - **Kotlinx Serialization** : JSON request and response serialization
@@ -129,17 +151,18 @@ The entire ecosystem runs 100% locally and fully offline.
 ## 🏗️ **Current Kotlin Architecture**
 
    - **org.dcac** - application entry point and local execution demo
-   - **org.dcac.agents** - agent contracts and specialized agent skeletons
+   - **org.dcac.agents** - agent contracts and specialized agents, including planning, code, and review agents
    - **org.dcac.client** - LLM abstraction, structured LLM responses, Ollama HTTP client, LLM-specific exception handling, and JSON request/response DTOs
-   - **org.dcac.models** - shared domain models used across the orchestration workflow, including orchestration-level error reporting and final response output
-   - **org.dcac.tasks** - task validation, classification, and routing components
-   - **org.dcac.orchestrator** - central orchestration workflow coordinating validation, routing, chained execution, context sharing, result aggregation, and validation error propagation
+   - **org.dcac.models** - shared models used across orchestration, including tasks, results, workflow plans, workflow types, and complexity levels
+   - **org.dcac.workflow** - deterministic workflow planning components
+   - **org.dcac.tasks** - task validation and agent routing components
+   - **org.dcac.orchestrator** - central orchestration workflow coordinating validation, planning, workflow completion, routing, chained execution, context sharing, result aggregation, and validation error propagation
    - **org.dcac.synthesis** - final response synthesis components used to build user-facing orchestration output
    - **org.dcac.prompts** - prompt loading utilities used to read agent system prompts from resources
+   - **org.dcac.utils** - runtime utilities such as duration formatting and progress timers
    - **src/main/resources** - application configuration and externalized prompt templates
-   - **src/test/kotlin** - JVM unit tests and fake test utilities for validators, agents, and orchestrator behavior
+   - **src/test/kotlin** - JVM unit tests and fake test utilities for validators, agents, synthesis, and orchestrator behavior
    - **ARCHITECTURE.md** - detailed documentation of the current Kotlin orchestration structure
-   
 
 
 ## 🔁 **Current Workflow**
@@ -149,12 +172,16 @@ The entire ecosystem runs 100% locally and fully offline.
    - Agent system prompts are loaded from `src/main/resources/prompts`
    - `AiOrchestrator` validates the task with `TaskValidator`
    - If validation fails, `AiOrchestrator` returns an unsuccessful `OrchestrationResult` with validation errors and no agent execution
-   - `TaskRouter` selects compatible agents according to the task type
-   - `ManagerAgent` sends the request to Mistral 7B through `OllamaClient`
-   - `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs`
-   - `CodeAgent` receives the original instruction and the manager plan, then sends the enriched prompt to Qwen 2.5 Coder 7B
-   - `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs`
-   - `ReviewAgent` receives the original instruction, the manager plan, and the generated code, then sends the review prompt to DeepSeek Coder 6.7B
+   - `PlanningAgent` sends the user instruction to the local planning model through `OllamaClient`
+   - `PlanningAgent` returns a structured workflow decision containing workflow type, complexity, and reason
+   - `WorkflowPlanner` completes the workflow plan by resolving the selected workflow into ordered agent identifiers
+   - `TaskRouter` selects the concrete agent instances from the planned agent identifiers
+   - `AiOrchestrator` logs the selected workflow, complexity, planning reason, selected agents, and execution timings
+   - Selected agents are executed sequentially
+   - Each agent receives the original task and the current `ExecutionContext`
+   - `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`
+   - `CodeAgent` generates implementation-ready code through the local code model
+   - `ReviewAgent`, when selected, reviews the generated code using previous agent output from the execution context
    - `OllamaClient` serializes requests and deserializes responses with Kotlinx Serialization
    - `OllamaClient` converts client failures into `LlmClientException`
    - `LlmResponse` stores both the requested model and the actual model confirmed by Ollama
@@ -166,26 +193,27 @@ The entire ecosystem runs 100% locally and fully offline.
    - If at least one selected agent fails, the final `OrchestrationResult.success` value becomes `false`
    - `App.kt` displays the synthesized `Final Response` first
    - Separated agent responses are displayed afterward as developer details with `agentId`, `role`, `model`, `success`, `errorMessage`, and `output`
-   - Selected agents are currently executed sequentially
 
 
 ## ⚠️ **Current Limitations**
 
-The project currently contains a working first version of the local chained orchestration pipeline.
+The project currently contains a working local planning-based orchestration pipeline.
 
-   - The manager agent creates a plan but does not yet dynamically decide which agents should run
-   - `TaskRouter` still controls agent selection through static support rules
-   - Final response synthesis is implemented, but it is currently deterministic and may duplicate detailed agent content
+   - Planning is currently performed by a local LLM and can be slow for simple requests
+   - A deterministic fast-path planner for obvious workflows is not implemented yet
+   - Domain-specific prompt selection is not implemented yet
+   - Code and review prompts are still global rather than specialized by technical domain
+   - Room-specific generation and review still need stronger framework-specific guardrails
+   - Test and documentation workflow types exist as planning targets, but dedicated agents are not implemented yet
+   - Final response synthesis is implemented, but it is deterministic and may duplicate detailed agent content
    - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
-   - Task type is currently provided manually
-   - `TaskClassifier` is not wired into the main workflow yet
    - Generated code is displayed in the console but not written to files yet
    - Error handling exists, but retry and fallback strategies are not implemented yet
    - Client request timeouts are not configured yet
    - Model availability is not checked before generation
    - ComfyUI integration is not implemented in Kotlin yet
    - Agent execution is currently sequential
-   - Unit tests exist for validation, agents, and orchestrator behavior, but client integration and end-to-end tests are not implemented yet
+   - Unit tests exist for validation, agents, synthesis, and orchestration behavior, but client integration and end-to-end tests are not implemented yet
 
 
 ## 🚀 **How to Use**

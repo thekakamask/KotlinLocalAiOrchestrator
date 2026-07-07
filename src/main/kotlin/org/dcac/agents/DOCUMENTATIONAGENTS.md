@@ -3,29 +3,34 @@
 ## 📌 Summary
 
 The `agents` package is the execution layer of the orchestration system.
-It defines the common agent contract, the standardized agent result, and the specialized agents used in the current chained workflow.
+It defines the common agent contract, the standardized agent result, and the specialized agents used by the current local workflow.
 
 Each specialized agent has:
 - a unique identifier
 - a human-readable role
-- a set of supported task types
-- a dedicated local Ollama model
-- an externalized system prompt
-- access to the shared `LlmClient`
+- a dedicated local Ollama model when it is LLM-based
+- an externalized system prompt when it is prompt-driven
+- access to the shared `LlmClient` when it calls a text model
 - access to the shared `ExecutionContext`
 - a standardized `AgentResult` output with success or failure metadata
 
-The current text-based agents are:
-- `ManagerAgent`
+The current active text-based agents are:
+- `PlanningAgent`
 - `CodeAgent`
 - `ReviewAgent`
 
-These agents are selected by `TaskRouter` and executed sequentially by `AiOrchestrator`.
+Legacy / transitional agent:
+- `ManagerAgent`
 
-The current agent workflow is chained:
-- `ManagerAgent` creates an execution plan
-- `CodeAgent` uses the manager plan to generate an implementation
-- `ReviewAgent` reviews the generated code using the original instruction and previous agent outputs
+The current workflow is no longer a fixed manager → code → review chain.
+
+Instead:
+- `PlanningAgent` analyzes the user request and selects a workflow type, complexity level, and reason
+- `WorkflowPlanner` resolves that decision into ordered agent identifiers
+- `TaskRouter` maps those identifiers to concrete agent instances
+- `AiOrchestrator` executes the selected agents sequentially
+- `CodeAgent` generates implementation output when selected
+- `ReviewAgent` reviews generated output when selected
 
 
 ## 🧩 Classes Description
@@ -88,47 +93,86 @@ The console output uses the enriched metadata to display:
 Its purpose is to give the orchestrator a consistent result format for every type of agent.
 
 
-### `ManagerAgent`
+### `PlanningDecision`
 
-`ManagerAgent` is the planning and coordination agent.
+`PlanningDecision` represents the structured output expected from the planning model.
+
+Current properties:
+- `workflowType` → the workflow category selected by the planning model
+- `complexity` → the estimated task complexity
+- `reason` → short explanation for the selected workflow
+
+This model is decoded from the planning model response and converted into a `WorkflowPlan`.
+Its purpose is to keep planning output structured, predictable, and easy to process by Kotlin code.
+
+
+### `PlanningAgent`
+
+`PlanningAgent` is the workflow selection agent.
 
 Current configuration:
+- role → workflow planning agent
+- local model → Qwen 3 8B candidate
+- backend → `LlmClient`
+- system prompt → loaded from `src/main/resources/prompts/planning.txt`
+
+Its system prompt asks the model to:
+- analyze the user request
+- choose the most appropriate workflow type
+- estimate task complexity
+- provide a short reason
+- return structured JSON only
+- avoid generating implementation code
+
+`PlanningAgent` receives the original user instruction and sends it to the planning model through `LlmClient.generate()`.
+
+It returns a `WorkflowPlan`-compatible decision containing:
+- `workflowType`
+- `complexity`
+- `reason`
+
+Unlike regular executable agents, `PlanningAgent` is used before the main agent pipeline.
+Its role is to help choose the workflow, not to produce user-facing implementation output.
+
+Current capabilities:
+- workflow selection
+- complexity estimation
+- planning reason generation
+- structured planning response parsing
+
+Current limitations:
+- planning is still performed by a local LLM and can be slow for simple requests
+- obvious workflow decisions may later be handled by deterministic Kotlin code
+- invalid or malformed planning JSON still requires robust fallback handling
+
+
+### `ManagerAgent`
+
+`ManagerAgent` is a legacy planning and coordination agent.
+
+Previous configuration:
 - agent identifier → `manager`
 - role → planning and coordination agent
 - local model → Mistral 7B
 - backend → `LlmClient`
-- system prompt → loaded from `src/main/resources/prompts/manager.txt`
-- supported task types → all task types
+- system prompt → previously loaded from `src/main/resources/prompts/manager.txt`
 
-Its system prompt asks the model to:
-- understand the user request
-- organize the work
-- produce a clear execution plan
-- define expected output
-- identify constraints and risks
-- avoid generating final source code
+Previous role:
+- produce an execution plan
+- guide `CodeAgent`
+- provide context for `ReviewAgent`
 
-`ManagerAgent` receives the original user instruction and sends it to Mistral through `LlmClient.generate()`.
-It returns the generated planning response inside an `AgentResult`.
-If the LLM client fails, `ManagerAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
-
-Its output is stored by `AiOrchestrator` in:
-ExecutionContext.agentOutputs["manager"]
-
-This allows `CodeAgent` and `ReviewAgent` to reuse the manager plan during the same workflow.
-
-Current role:
-- ManagerAgent plans and guides the workflow, but it does not yet dynamically decide which agents should run.
-- Agent selection is still controlled by TaskRouter.
+Current status:
+- no longer part of the default active workflow
+- replaced by `PlanningAgent` and deterministic `WorkflowPlanner` for workflow selection
+- may be reused later for complex architecture planning or multi-step task decomposition
 
 Possible future responsibilities:
-- task decomposition
+- complex task decomposition
+- architecture-level planning
 - subtask creation
-- agent selection recommendations
-- execution supervision
-- workflow adaptation
-- provide structured planning data for final response synthesis
-- structured planning output
+- strategic planning for large workflows
+- structured planning output for complex requests
 
 
 ### `CodeAgent`
@@ -138,45 +182,30 @@ Possible future responsibilities:
 Current configuration:
 - agent identifier → `code`
 - role → implementation agent
-- local model → Qwen 2.5 Coder 7B
+- local model → Qwen 2.5 Coder 14B candidate
 - backend → `LlmClient`
 - system prompt → loaded from `src/main/resources/prompts/code.txt`
-- supported task types → `CODE`, `TEST`, `DOCUMENTATION`, and `GENERAL`
 
 Its system prompt asks the model to:
-- generate clean and maintainable implementation-ready code
-- follow the manager plan when provided
-- adapt to the requested programming language and project context
-- apply general software engineering best practices
-- respect DRY, SOLID, readability, maintainability, reliability, security, and object-oriented design principles
+- generate clean, valid, idiomatic, implementation-ready code
+- prioritize the original user request
+- respect valid target-language syntax
+- respect target-language and framework conventions
+- keep the implementation focused and maintainable
+- avoid unnecessary boilerplate and speculative architecture
 - state assumptions when necessary
 
 `CodeAgent` receives:
 - the original user instruction
-- the manager plan from `ExecutionContext.agentOutputs["manager"]`
+- the current `ExecutionContext`
+- previous agent outputs when available
 
-It sends an enriched prompt to Qwen through `LlmClient.generate()`.
+It sends an enriched prompt to the configured code model through `LlmClient.generate()`.
 It returns the generated implementation inside an `AgentResult`.
 If the LLM client fails, `CodeAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
 Its output is stored by `AiOrchestrator` in:
 ExecutionContext.agentOutputs["code"]
-
-This allows `ReviewAgent` to review the actual generated code.
-
-Current capabilities:
-- real local code generation
-- manager-plan-aware implementation
-- language-aware and context-aware implementation
-- assumption explanation
-- code and technical draft generation
-
-Possible future responsibilities:
-- inspect the current project structure
-- generate source files
-- generate tests
-- refactor existing code
-- return structured generated artifacts
 - structured code generation output
 
 
@@ -187,25 +216,25 @@ Possible future responsibilities:
 Current configuration:
 - agent identifier → `review`
 - role → code review agent
-- local model → DeepSeek Coder 6.7B
+- local model → DeepSeek Coder V2 16B candidate
 - backend → `LlmClient`
 - system prompt → loaded from `src/main/resources/prompts/review.txt`
-- supported task types → `REVIEW`, `CODE`, `TEST`, and `GENERAL`
 
 Its system prompt asks the model to:
-- review generated code
+- review generated code against the original user request
+- check target-language syntax and idioms
 - detect confirmed issues
-- identify optional improvements
-- separate speculative risks from real problems
+- separate optional improvements from real problems
+- separate speculative risks from confirmed issues
 - avoid inventing unsupported language behavior
-- check maintainability, correctness, testability, security, and consistency with the manager plan
+- check maintainability, correctness, testability, and security when relevant
 
 `ReviewAgent` receives:
 - the original user instruction
-- the manager plan from ExecutionContext.agentOutputs["manager"]
-- the generated code from ExecutionContext.agentOutputs["code"]
+- the current `ExecutionContext`
+- the generated code from `ExecutionContext.agentOutputs["code"]` when available
 
-It sends an enriched review prompt to DeepSeek through `LlmClient.generate()`.
+It sends an enriched review prompt to the configured review model through `LlmClient.generate()`.
 It returns the generated review inside an `AgentResult`.
 If the LLM client fails, `ReviewAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
@@ -213,7 +242,6 @@ Current capabilities:
 - real local code review
 - review of the actual `CodeAgent` output
 - consistency check against the original instruction
-- consistency check against the manager plan
 - structured review output
 
 Possible future responsibilities:
@@ -222,27 +250,38 @@ Possible future responsibilities:
 - detect missing tests more precisely
 - validate architecture decisions
 - approve or reject generated artifacts
-- trigger a correction loop with CodeAgent
-- structured error and severity reporting
+- trigger a correction loop with `CodeAgent`
+- use domain-specific review prompts
 
 
 ## ⚙️ Current Agent Workflow
 
-For a `TaskType.CODE` task, the current workflow is:
-1. `TaskRouter` checks every registered agent with `supports(task)`.
-2. `ManagerAgent`, `CodeAgent`, and `ReviewAgent` are selected.
-3. `AiOrchestrator` executes them sequentially.
-4. `ManagerAgent` receives the original user instruction and produces a plan.
-5. `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs["manager"]`.
-6. `CodeAgent` receives the original instruction and the manager plan.
-7. `CodeAgent` generates implementation output.
+The current workflow is selected dynamically instead of being a fixed manager → code → review chain.
+
+Current high-level flow:
+1. `AiOrchestrator` validates the incoming `OrchestrationTask`.
+2. `PlanningAgent` analyzes the user instruction.
+3. `PlanningAgent` returns a workflow type, complexity level, and reason.
+4. `WorkflowPlanner` converts the selected workflow into ordered agent identifiers.
+5. `TaskRouter` resolves the planned identifiers into concrete agent instances.
+6. `AiOrchestrator` executes selected agents sequentially.
+7. `CodeAgent` generates implementation output when selected.
 8. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
-9. `ReviewAgent` receives the original instruction, the manager plan, and the generated code.
-10. `ReviewAgent` reviews the generated code.
-11. Each agent returns an enriched `AgentResult`.
-12. If an agent fails, it returns a failed `AgentResult` instead of crashing the application.
-13. The results are aggregated into an `OrchestrationResult`.
-14. The collected agent results can then be used by `ResponseSynthesizer` to build the final user-facing response.
+9. `ReviewAgent` reviews the generated code when selected.
+10. Each executable agent returns an enriched `AgentResult`.
+11. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
+12. The results are aggregated into an `OrchestrationResult`.
+13. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
+
+Example workflow mappings:
+- `CODE_ONLY` → `CodeAgent`
+- `CODE_REVIEW` → `CodeAgent`, then `ReviewAgent`
+- `REVIEW_ONLY` → `ReviewAgent`
+
+Future workflow mappings may include:
+- `CODE_REVIEW_TEST`
+- `CODE_REVIEW_DOCUMENTATION`
+- `CODE_REVIEW_TEST_DOCUMENTATION`
 
 The current workflow produces real local model responses and supports data sharing between agents through `ExecutionContext.agentOutputs`.
 
@@ -259,3 +298,13 @@ The common `Agent` interface can support additional implementations, such as:
 - `BuildAgent`
 
 These future agents may use Ollama, ComfyUI, Gradle, the local filesystem, or other offline tools while keeping the same orchestration contract.
+
+Future improvements may also include specialized prompt variants for the same agent type, such as:
+- general code prompt
+- Room code prompt
+- ViewModel code prompt
+- UI code prompt
+- test code prompt
+- general review prompt
+- Room review prompt
+- ViewModel review prompt

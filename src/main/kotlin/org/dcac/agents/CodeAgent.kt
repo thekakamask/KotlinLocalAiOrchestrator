@@ -6,8 +6,6 @@ import org.dcac.client.LlmClient
 import org.dcac.models.ExecutionContext
 // Import the task model received by this agent.
 import org.dcac.models.OrchestrationTask
-// Import the task categories used to decide if this agent can handle a task.
-import org.dcac.models.TaskType
 
 /**
  * Specialized agent dedicated to implementation-oriented tasks
@@ -19,7 +17,7 @@ class CodeAgent(
     private val llmClient: LlmClient,
     private val systemPrompt: String,
     // Local model used by the code agent.
-    private val model: String = "qwen2.5-coder:7b"
+    private val model: String = "qwen2.5-coder:14b"
 ) : Agent {
     // Stable identifier used by the orchestrator and final results.
     override val id: String = "code"
@@ -59,10 +57,10 @@ class CodeAgent(
         """.trimIndent()*/
 
     // Decide whether the CodeAgent should participate in the given task.
-    override fun supports(task: OrchestrationTask): Boolean {
+    /*override fun supports(task: OrchestrationTask): Boolean {
         // Accept tasks related to code, tests, documentation, or general development work.
         return task.type in setOf(TaskType.CODE, TaskType.TEST, TaskType.DOCUMENTATION, TaskType.GENERAL)
-    }
+    }*/
 
     // Execute the task and return the CodeAgent result.
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {

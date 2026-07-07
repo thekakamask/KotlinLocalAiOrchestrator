@@ -1,3 +1,4 @@
+/*
 // Declare that this file belongs to the agents package.
 package org.dcac.agents
 
@@ -7,16 +8,18 @@ import org.dcac.models.ExecutionContext
 // Import the task model received by this agent.
 import org.dcac.models.OrchestrationTask
 
+*/
 /**
  * Coordinator agent responsible for high-level planning and orchestration decisions.
- */
+ *//*
+
 // Define the manager agent and make it implement the common Agent contract.
 class ManagerAgent(
     // LLM client used by this agent to generate real model responses.
     private val llmClient: LlmClient,
     private val systemPrompt: String,
     // Local model used by the manager agent.
-    private val model: String = "mistral:7b"
+    private val model: String = "qwen3:8b"
 ) : Agent {
 
     // Stable identifier used by the orchestrator and final results.
@@ -57,3 +60,4 @@ class ManagerAgent(
     }
 }
 
+*/

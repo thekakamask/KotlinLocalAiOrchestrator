@@ -39,9 +39,9 @@ Current agents depend on `LlmClient` instead of depending directly on `OllamaCli
 This allows the same agent implementation to work with another client implementation in the future.
 
 Current usage:
-- `ManagerAgent` calls `LlmClient` with Mistral 7B
-- `CodeAgent` calls `LlmClient` with Qwen 2.5 Coder 7B
-- `ReviewAgent` calls `LlmClient` with DeepSeek Coder 6.7B
+- `PlanningAgent` calls `LlmClient` with the current planning model candidate
+- `CodeAgent` calls `LlmClient` with the current code generation model candidate
+- `ReviewAgent` calls `LlmClient` with the current review model candidate
 
 Possible future implementations:
 - another local LLM runtime client
@@ -127,7 +127,7 @@ If Ollama returns a non-successful HTTP status, `OllamaClient` throws an `LlmCli
 Unexpected network, JSON parsing, or client-side failures are also wrapped into `LlmClientException`.
 
 The current implementation is shared by all text-based agents.
-`App.kt` creates one `OllamaClient` instance and injects it into `ManagerAgent`, `CodeAgent`, and `ReviewAgent`.
+`App.kt` creates one `OllamaClient` instance and injects it into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`.
 
 
 ## 📦 Ollama DTOs
@@ -144,9 +144,10 @@ Current properties:
 - `stream` → controls response streaming and currently defaults to `false`
 
 Example model values:
+- `qwen3:8b`
+- `qwen2.5-coder:14b`
+- `deepseek-coder-v2:16b`
 - `mistral:7b`
-- `qwen2.5-coder:7b`
-- `deepseek-coder:6.7b`
 
 The JSON configuration uses `encodeDefaults = true` to ensure that the default `stream = false` value is included in the request.
 Without this configuration, Ollama would use streaming mode and return multiple JSON objects.
@@ -186,8 +187,8 @@ The current client workflow is:
 8. If the request or response handling fails, `OllamaClient` throws an `LlmClientException`.
 9. If generation succeeds, `OllamaClient` creates an `LlmResponse`.
 10. The agent reads `LlmResponse.actualModel` and `LlmResponse.text`.
-11. The agent stores these values inside an enriched `AgentResult`.
-12. If the client throws an exception, the agent catches it and returns a failed `AgentResult`.
+11. Executable agents store these values inside an enriched `AgentResult`.
+12. If the client throws an exception, executable agents catch it and return a failed `AgentResult`.
 
 
 ## ⚠️ Current Limitations
@@ -205,6 +206,7 @@ The current client integration successfully generates local model responses, but
 - detailed Ollama metadata is ignored
 - client errors are converted into failed agent results, but advanced recovery strategies are not implemented
 - configuration is not yet loaded dynamically from `application.properties`
+- model configuration is partially manual and still evolving while planning, code, and review models are being tested
 
 
 ## 🚀 Future Responsibilities

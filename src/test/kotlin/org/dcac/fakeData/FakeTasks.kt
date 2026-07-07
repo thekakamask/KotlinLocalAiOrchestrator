@@ -1,7 +1,6 @@
 package org.dcac.fakeData
 
 import org.dcac.models.OrchestrationTask
-import org.dcac.models.TaskType
 
 object FakeTasks {
 
@@ -9,8 +8,7 @@ object FakeTasks {
         return OrchestrationTask(
             id = "task-test",
             title = "Create domain class",
-            instruction = "Create an Order entity.",
-            type = TaskType.CODE
+            instruction = "Create an Order entity."
         )
     }
 
@@ -18,8 +16,7 @@ object FakeTasks {
         return OrchestrationTask(
             id = "task-test",
             title = "",
-            instruction = "Create an Order entity.",
-            type = TaskType.CODE
+            instruction = "Create an Order entity."
         )
     }
 
@@ -27,8 +24,7 @@ object FakeTasks {
         return OrchestrationTask(
             id = "task-test",
             title = "Create domain class",
-            instruction = "",
-            type = TaskType.CODE
+            instruction = ""
         )
     }
 
@@ -36,8 +32,7 @@ object FakeTasks {
         return OrchestrationTask(
             id = "task-test",
             title = "",
-            instruction = "",
-            type = TaskType.CODE
+            instruction = ""
         )
     }
 }

@@ -20,14 +20,13 @@ Current properties:
 - `userLocale` → defines the user's locale, with `fr-FR` as the current default
 - `agentOutputs` → stores outputs produced by previous agents during the same workflow
 
-`ExecutionContext` is passed to every selected agent through the `run()` function.
-It is now actively used to share data between agents during chained orchestration.
+`ExecutionContext` is passed to every selected executable agent through the `run()` function.
+It is actively used to share data between agents during chained orchestration.
 
 Current workflow usage:
-- `AiOrchestrator` stores the manager output in `agentOutputs["manager"]`
-- `CodeAgent` reads `agentOutputs["manager"]` to use the manager plan
 - `AiOrchestrator` stores the code output in `agentOutputs["code"]`
-- `ReviewAgent` reads `agentOutputs["manager"]` and `agentOutputs["code"]` to review the generated code
+- `ReviewAgent` reads `agentOutputs["code"]` to review the generated code
+- Future agents can read previous outputs to continue the workflow
 
 Possible future responsibilities:
 - current workspace information
@@ -38,27 +37,27 @@ Possible future responsibilities:
 - task history references
 - target file or module information
 - file writing permissions
+- generated artifact references
 
-Its purpose is to give every agent access to the same execution environment and workflow memory during a multi-step orchestration pipeline.
+Its purpose is to give every selected agent access to the same execution environment and workflow memory during a multi-step orchestration pipeline.
 
 
 ### `OrchestrationTask`
 
 `OrchestrationTask` represents the main input unit handled by the orchestrator.
-Its role is to encapsulate a single user request or subtask in a structured format. It is the central object passed through the orchestration pipeline.
+Its role is to encapsulate a single user request or subtask in a structured format.
 
 Current properties:
 - `id` → unique identifier used to track the task
 - `title` → human-readable title describing the task
-- `instruction` → detailed user request sent to selected agents
-- `type` → task category used during agent routing
+- `instruction` → detailed user request sent to the planning and execution workflow
 
-The task type is currently assigned manually when the task is created in `App.kt`. `TaskClassifier` exists, but it is not yet connected to the main execution workflow.
+The active workflow no longer requires a manually assigned task type.
+The user instruction is analyzed by the planning step to choose the workflow.
 
 This model is currently used by:
 - `TaskValidator`
-- `TaskRouter`
-- `ManagerAgent`
+- `PlanningAgent`
 - `CodeAgent`
 - `ReviewAgent`
 - `AiOrchestrator`
@@ -70,32 +69,85 @@ Possible future properties:
 - routing hints
 - parent task identifier
 - task status
+- user intent metadata
 
 Its purpose is to standardize how work units move through the system.
 
 
 ### `TaskType`
 
-`TaskType` defines the canonical categories used to classify and route tasks.
-Its role is to provide a standardized task taxonomy for the orchestrator. Each task type helps determine which agents should participate in a workflow.
+`TaskType` defines the previous task category taxonomy used by the earlier routing workflow.
 
 Current values:
-- `CODE` → development and implementation tasks
-- `REVIEW` → quality control and validation tasks
-- `TEST` → testing and verification tasks
-- `DOCUMENTATION` → technical writing and documentation generation
-- `IMAGE` → image generation workflows
-- `VIDEO` → video generation workflows
-- `GENERAL` → generic or uncategorized tasks
+- `CODE`
+- `REVIEW`
+- `TEST`
+- `DOCUMENTATION`
+- `IMAGE`
+- `VIDEO`
+- `GENERAL`
 
-`TaskType` is already used by `TaskRouter` and each agent's `supports()` function.
+Current status:
+- transitional
+- no longer the main active workflow decision mechanism
+- may still exist in the codebase during refactoring
+- may still be used by legacy tests or older components
 
-For example, a `CODE` task currently selects:
-- `ManagerAgent`, because it supports every task type
-- `CodeAgent`, because it supports code-related tasks
-- `ReviewAgent`, because it supports code review and validation tasks
+The active workflow now relies on `PlanningAgent`, `WorkflowType`, `TaskComplexity`, and `WorkflowPlan` instead of manually assigning a `TaskType`.
+Its future role is undecided. It may be removed, kept for UI hints, or reused as a secondary classification signal.
 
-Its purpose is to enable consistent task dispatching across specialized agents.
+
+### `WorkflowType`
+
+`WorkflowType` defines the execution strategy selected by the planning step.
+Its role is to represent what kind of workflow should run for a user request.
+
+Current values:
+- `CODE_ONLY` → generate code without review
+- `CODE_REVIEW` → generate code and review it
+- `CODE_REVIEW_TEST` → generate code, review it, and prepare for test generation
+- `CODE_REVIEW_DOCUMENTATION` → generate code, review it, and prepare for documentation
+- `CODE_REVIEW_TEST_DOCUMENTATION` → generate code, review it, and prepare for both tests and documentation
+- `REVIEW_ONLY` → review existing code or content
+- `DOCUMENTATION_ONLY` → documentation-focused workflow
+- `GENERAL` → fallback workflow
+
+`WorkflowType` is selected by `PlanningAgent` and then resolved by `WorkflowPlanner` into ordered agent identifiers.
+Its purpose is to separate the user intent from the actual agent pipeline.
+
+
+### `TaskComplexity`
+
+`TaskComplexity` represents the estimated complexity of the user request.
+
+Current values:
+- `SIMPLE` → small or focused request
+- `MODERATE` → request involving multiple concerns or structured implementation
+- `COMPLEX` → request likely requiring several workflow steps, more context, or future specialized agents
+
+`TaskComplexity` is selected by `PlanningAgent`.
+
+It is currently used mainly for observability and future workflow decisions.
+It may later influence model selection, prompt selection, test generation, or whether a deterministic fast path is allowed.
+
+
+### `WorkflowPlan`
+
+`WorkflowPlan` represents the selected execution workflow.
+
+Current properties:
+- `workflowType` → selected workflow category
+- `complexity` → estimated task complexity
+- `agentIds` → ordered identifiers of the agents that should run
+- `reason` → short explanation of why the workflow was selected
+
+Current workflow usage:
+- `PlanningAgent` produces the initial workflow decision
+- `WorkflowPlanner` completes the plan by filling `agentIds`
+- `TaskRouter` uses `agentIds` to select concrete agent instances
+- `AiOrchestrator` executes selected agents in the planned order
+
+Its purpose is to make workflow selection explicit, inspectable, and deterministic after the planning decision.
 
 
 ### `OrchestrationResult`
@@ -106,12 +158,9 @@ Its role is to aggregate all agent-level outputs into a single structured respon
 Current properties:
 - `taskId` → identifies the task that was executed
 - `success` → is `true` only when validation succeeds and every selected agent reports success
-- `results` → contains the enriched `AgentResult` returned by each selected agent
+- `results` → contains the enriched `AgentResult` returned by each selected executable agent
 - `errors` → contains validation or orchestration-level errors that are not tied to a specific agent
 - `finalResponse` → contains the synthesized user-facing response built from agent results
-
-The current execution flow creates one `AgentResult` per selected agent when execution reaches the agent workflow.
-These results are then stored inside the final `OrchestrationResult`.
 
 If task validation fails before agent execution, `results` stays empty and validation messages are stored in `errors`.
 
@@ -119,7 +168,7 @@ Possible future properties:
 - structured validation error objects
 - workflow diagnostics
 - execution duration
-- workflow-level diagnostics
+- selected workflow metadata
 - structured final response sections
 - generated artifact references
 
@@ -130,28 +179,23 @@ This model is the final object returned to the application entry point and will 
 ## 🔗 Related Model: `AgentResult`
 
 `AgentResult` is located in the `agents` package, but it is directly related to `OrchestrationResult`.
-Each selected agent returns an `AgentResult` after execution.
+Each selected executable agent returns an `AgentResult` after execution.
 
 Current properties:
 - `agentId` → identifies which agent produced the response
 - `role` → describes the human-readable responsibility of the agent
 - `model` → contains the actual model confirmed by the LLM backend
 - `success` → indicates whether the agent execution succeeded
-- `output` → contains the text generated by the assigned Ollama model
+- `output` → contains the text generated by the assigned local model
 - `errorMessage` → optional error details when agent execution fails
 
 `AgentResult.errorMessage` is used for agent-level failures, while `OrchestrationResult.errors` is used for validation or orchestration-level failures.
 
-Current agent and model assignments:
-- `manager` → `ManagerAgent` using Mistral 7B
-- `code` → `CodeAgent` using Qwen 2.5 Coder 7B
-- `review` → `ReviewAgent` using DeepSeek Coder 6.7B
+Current executable agent assignments:
+- `code` → `CodeAgent` using the current code model candidate
+- `review` → `ReviewAgent` using the current review model candidate
 
-The current workflow is chained:
-- `ManagerAgent` produces a planning output
-- `CodeAgent` receives the original instruction and the manager output
-- `ReviewAgent` receives the original instruction, the manager output, and the code output
-
+The planning step produces a `WorkflowPlan`, while executable agents produce `AgentResult` values.
 `AgentResult.model` is populated from `LlmResponse.actualModel`, meaning it reflects the model confirmed by the backend response.
 
 In the future, `AgentResult` may also contain:

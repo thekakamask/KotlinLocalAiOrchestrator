@@ -6,23 +6,26 @@ This document describes the current architecture of KotlinLocalAiOrchestrator, t
 ## 1. High-Level Architecture
 
 KotlinLocalAiOrchestrator currently provides a modular, fully local orchestration pipeline connected to Ollama.
+The current architecture is moving from a static manager-led workflow to a planning-based workflow selection system.
 
 The architecture follows this execution flow:
-1. A user request is represented by domain objects from `models`.
+1. A user request is represented by an `OrchestrationTask`.
 2. Agent system prompts are loaded from `src/main/resources/prompts`.
-3. The task is validated and routed by components from `tasks`.
-4. `AiOrchestrator` coordinates the complete chained execution workflow.
-5. Compatible agents from `agents` process the task sequentially.
-6. `ManagerAgent` produces an execution plan.
-7. `CodeAgent` receives the original instruction and the manager plan.
-8. `ReviewAgent` receives the original instruction, the manager plan, and the generated code.
-9. Text-based agents use `LlmClient` to communicate with Ollama.
-10. `OllamaClient` serializes requests, sends them to local models, and converts client failures into `LlmClientException`.
-11. Each agent returns an enriched `AgentResult`, including success or failure metadata.
-12. The orchestrator aggregates all results and validation errors into an `OrchestrationResult`.
-13. `ResponseSynthesizer` builds a final user-facing response from the agent results.
-14. The final response is stored in `OrchestrationResult.finalResponse`.
-15. The application displays the final response first, then separated developer details.
+3. The task is validated by `TaskValidator`.
+4. `PlanningAgent` analyzes the user instruction and selects a workflow type, complexity level, and planning reason.
+5. `WorkflowPlanner` completes the planning decision by resolving the selected workflow into ordered agent identifiers.
+6. `TaskRouter` maps planned agent identifiers to concrete agent instances.
+7. `AiOrchestrator` coordinates the complete execution workflow.
+8. Selected agents from `agents` process the task sequentially.
+9. `CodeAgent`, when selected, generates implementation output.
+10. `ReviewAgent`, when selected, reviews the generated output.
+11. Text-based agents use `LlmClient` to communicate with Ollama.
+12. `OllamaClient` serializes requests, sends them to local models, and converts client failures into `LlmClientException`.
+13. Each agent returns an enriched `AgentResult`, including success or failure metadata.
+14. The orchestrator aggregates all results and validation errors into an `OrchestrationResult`.
+15. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+16. The final response is stored in `OrchestrationResult.finalResponse`.
+17. The application displays the final response first, then separated developer details.
 
 The current workflow runs entirely on the local machine.
 
@@ -35,47 +38,51 @@ The current runtime entry point is:
 `App.kt` creates and connects the main application components:
 - one shared `OllamaClient`
 - one `PromptLoader`
-- loaded prompts for manager, code, and review agents
-- `ManagerAgent`
+- loaded prompts for planning, code, and review agents
+- `PlanningAgent`
 - `CodeAgent`
 - `ReviewAgent`
+- `WorkflowPlanner`
 - `TaskRouter`
 - `TaskValidator`
+- `ResponseSynthesizer`
 - `AiOrchestrator`
-- a sample `OrchestrationTask`
+- sample `OrchestrationTask` values
 - an `ExecutionContext`
 
 The current execution flow is:
 1. `App.kt` creates an `OllamaClient`.
 2. `App.kt` creates a `PromptLoader`.
-3. The prompt loader reads `prompts/manager.txt`, `prompts/code.txt`, and `prompts/review.txt`.
+3. The prompt loader reads `prompts/planning.txt`, `prompts/code.txt`, and `prompts/review.txt`.
 4. The same `OllamaClient` instance and the loaded system prompts are injected into the text-based agents.
-5. The agents are registered inside `TaskRouter`.
-6. `App.kt` creates an `OrchestrationTask`.
-7. The task type is currently assigned manually.
+5. `PlanningAgent` is created separately from the executable agent pipeline.
+6. `CodeAgent` and `ReviewAgent` are registered inside `TaskRouter`.
+7. `App.kt` creates an `OrchestrationTask`.
 8. `App.kt` creates an `ExecutionContext`.
 9. Both objects are passed to `AiOrchestrator.execute()`.
 10. `TaskValidator` validates the task.
 11. If validation fails, `AiOrchestrator` returns an unsuccessful `OrchestrationResult` with validation errors and no agent execution.
-12. `TaskRouter` selects compatible agents.
-13. Selected agents execute sequentially.
-14. `ManagerAgent` creates a plan with Mistral 7B.
-15. `AiOrchestrator` stores the manager output in `ExecutionContext.agentOutputs`.
-16. `CodeAgent` uses the original instruction and the manager plan to generate code with Qwen 2.5 Coder 7B.
-17. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs`.
-18. `ReviewAgent` uses the original instruction, the manager plan, and the generated code to review the result with DeepSeek Coder 6.7B.
-19. Each model response is returned through `LlmResponse`.
-20. If an agent fails, it returns an `AgentResult` with `success = false` and `errorMessage`.
-21. Each agent wraps its response into an enriched `AgentResult`.
-22. `AiOrchestrator` aggregates the results and errors into an `OrchestrationResult`.
-23. `ResponseSynthesizer` builds a final user-facing response from the agent results.
-24. `OrchestrationResult.finalResponse` stores the synthesized response.
-25. `App.kt` displays the final response first, then separated agent responses with metadata.
+12. `PlanningAgent` analyzes the user instruction and returns a structured workflow decision.
+13. `WorkflowPlanner` completes the workflow plan by resolving it into ordered agent identifiers.
+14. `TaskRouter` selects concrete agents from the planned agent identifiers.
+15. Selected agents execute sequentially.
+16. `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`.
+17. Each model response is returned through `LlmResponse`.
+18. If an agent fails, it returns an `AgentResult` with `success = false` and `errorMessage`.
+19. Each agent wraps its response into an enriched `AgentResult`.
+20. `AiOrchestrator` aggregates the results and errors into an `OrchestrationResult`.
+21. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+22. `OrchestrationResult.finalResponse` stores the synthesized response.
+23. `App.kt` displays the final response first, then separated agent responses with metadata.
 
-For the current `TaskType.CODE` example, the execution order is:
-1. `ManagerAgent` using Mistral 7B
-2. `CodeAgent` using Qwen 2.5 Coder 7B
-3. `ReviewAgent` using DeepSeek Coder 6.7B
+For a simple code workflow, the usual execution order is:
+1. `PlanningAgent` using the planning model
+2. `CodeAgent` using the code model
+
+For the default safe code workflow, the usual execution order is:
+1. `PlanningAgent` using the planning model
+2. `CodeAgent` using the code model
+3. `ReviewAgent` using the review model
 
 
 ## 3. Package Responsibilities
@@ -83,17 +90,20 @@ For the current `TaskType.CODE` example, the execution order is:
 ### `org.dcac`
 
 Contains the current application entry point.
-It creates the dependencies required by the orchestration workflow and runs a sample local task.
+It creates the dependencies required by the orchestration workflow and runs sample local tasks.
 
 
 ### `org.dcac.agents`
 
-Contains the common agent contract, the agent result model, and all specialized agent implementations.
+Contains the common agent contract, the agent result model, and specialized agent implementations.
 
-Current agents:
-- `ManagerAgent`
+Current active agents:
+- `PlanningAgent`
 - `CodeAgent`
 - `ReviewAgent`
+
+Legacy / transitional agents:
+- `ManagerAgent`
 
 Each text-based agent uses `LlmClient` to communicate with its assigned Ollama model.
 
@@ -118,30 +128,44 @@ This package isolates HTTP communication, JSON serialization, structured LLM res
 Contains shared domain models used across the orchestration workflow.
 
 Current models:
-- `TaskType`
 - `OrchestrationTask`
 - `ExecutionContext`
 - `OrchestrationResult`
+- `WorkflowPlan`
+- `WorkflowType`
+- `TaskComplexity`
+- `TaskType`
 
-These models provide the common data language used by tasks, agents, and the orchestrator.
+`TaskType` is currently transitional and is being phased out as the main routing mechanism.
+
+
+### `org.dcac.workflow`
+
+Contains deterministic workflow planning components.
+
+Current components:
+- `WorkflowPlanner`
+
+This package converts a workflow decision into an ordered list of agent identifiers.
 
 
 ### `org.dcac.tasks`
 
-Contains task preparation and routing components.
+Contains task validation and routing components.
 
 Current components:
 - `TaskValidator`
-- `TaskClassifier`
 - `TaskRouter`
+- `TaskClassifier`
 
-Validation and routing are connected to the current workflow. Classification exists but is not yet connected.
+Validation and routing are connected to the current workflow.
+`TaskClassifier` is transitional and is not the main workflow decision mechanism.
 
 
 ### `org.dcac.orchestrator`
 
 Contains the central application coordination service.
-`AiOrchestrator` validates tasks, routes them, executes selected agents, evaluates global success, and builds the final result.
+`AiOrchestrator` validates tasks, asks the planning agent for a workflow decision, completes the workflow plan, routes planned agents, executes selected agents, evaluates global success, and builds the final result.
 
 
 ### `org.dcac.prompts`
@@ -154,27 +178,42 @@ Current components:
 This package loads prompt templates from `src/main/resources/prompts` so agent behavior can be changed without modifying Kotlin source code.
 
 
+### `org.dcac.synthesis`
+
+Contains final response synthesis components.
+
+Current components:
+- `ResponseSynthesizer`
+
+This package builds the final user-facing response from agent results.
+
+
+### `org.dcac.utils`
+
+Contains shared runtime utilities.
+
+Current components:
+- `TimeUtils`
+
+This package currently provides duration formatting and progress timer support for long-running local model calls.
+
+
 ### `src/main/resources`
 
 Contains external configuration and prompt templates.
 
 Current resources:
 - `application.properties`
-- `prompts/manager.txt`
+- `prompts/planning.txt`
 - `prompts/code.txt`
 - `prompts/review.txt`
 
-Prompt resources are now loaded dynamically at runtime through `PromptLoader`.
+Prompt resources are loaded dynamically at runtime through `PromptLoader`.
 
 
 ### `src/test/kotlin`
 
 Contains JVM unit tests and reusable fake test utilities.
-
-Current test utilities:
-- `FakeTasks`
-- `FakeLlmClient`
-- `FakeAgent`
 
 Current tested areas:
 - task validation
@@ -182,6 +221,7 @@ Current tested areas:
 - orchestrator validation handling
 - orchestrator result aggregation
 - context sharing between agents
+- final response synthesis
 
 
 ## 4. File-by-File Description
@@ -232,18 +272,48 @@ Current properties:
 The `model` value is populated from the actual model confirmed by the LLM backend through `LlmResponse.actualModel`.
 
 
-### `src/main/kotlin/org/dcac/agents/ManagerAgent.kt`
+### `src/main/kotlin/org/dcac/agents/PlanningAgent.kt`
 
-Planning and coordination agent.
+Workflow selection agent.
 
 Current configuration:
-- identifier → `manager`
-- model → Mistral 7B
-- supports → every task type
+- identifier → planning-related workflow decision
+- model → planning model candidate, currently Qwen 3 8B
 - backend → `LlmClient`
+- prompt → `prompts/planning.txt`
 
-It sends the original user instruction to Mistral and returns a planning response.
-Its output is stored in `ExecutionContext.agentOutputs["manager"]` so downstream agents can use it.
+It sends the original user instruction to the planning model and expects a structured workflow decision.
+The returned decision includes:
+
+- `workflowType`
+- `complexity`
+- `reason`
+
+The planning agent does not generate code and does not replace the code or review agents.
+
+
+### `src/main/kotlin/org/dcac/agents/PlanningDecision.kt`
+
+Represents the structured planning output returned by the planning model.
+
+Current properties:
+- `workflowType`
+- `complexity`
+- `reason`
+
+This model is decoded from the planning model response and converted into a `WorkflowPlan`.
+
+
+### `src/main/kotlin/org/dcac/agents/ManagerAgent.kt`
+
+Legacy planning and coordination agent.
+
+Current status:
+- previously used as the default manager in the chained manager → code → review workflow
+- no longer the main workflow decision mechanism
+- kept during transition for experimentation or future complex planning use cases
+
+The current active workflow uses `PlanningAgent` and `WorkflowPlanner` instead of always running `ManagerAgent`.
 
 
 ### `src/main/kotlin/org/dcac/agents/CodeAgent.kt`
@@ -252,12 +322,11 @@ Implementation-focused agent.
 
 Current configuration:
 - identifier → `code`
-- model → Qwen 2.5 Coder 7B
-- supports → `CODE`, `TEST`, `DOCUMENTATION`, and `GENERAL`
+- model → Qwen 2.5 Coder 14B candidate
 - backend → `LlmClient`
 
-It receives the original user instruction and the manager plan from `ExecutionContext.agentOutputs["manager"]`.
-It sends an enriched prompt to Qwen and returns generated implementation output.
+It receives the original user instruction and the current `ExecutionContext`.
+It generates implementation-ready code using the configured code prompt.
 Its output is stored in `ExecutionContext.agentOutputs["code"]`.
 
 
@@ -267,12 +336,11 @@ Review and quality-focused agent.
 
 Current configuration:
 - identifier → `review`
-- model → DeepSeek Coder 6.7B
-- supports → `REVIEW`, `CODE`, `TEST`, and `GENERAL`
+- model → DeepSeek Coder V2 16B candidate
 - backend → `LlmClient`
 
-It receives the original user instruction, the manager plan, and the code output from `ExecutionContext.agentOutputs["code"]`.
-It sends an enriched review prompt to DeepSeek and returns a structured review.
+It receives the original user instruction and previous agent outputs from `ExecutionContext`.
+When code output exists, it reviews the generated code and returns a structured review.
 
 
 ## Client
@@ -361,18 +429,42 @@ Both DTOs use `@Serializable`.
 
 ## Models
 
-### `src/main/kotlin/org/dcac/models/TaskType.kt`
+### `src/main/kotlin/org/dcac/models/WorkflowType.kt`
 
-Defines task categories used during agent routing.
+Defines workflow categories selected by the planning step.
 
 Current values:
-- `CODE`
-- `REVIEW`
-- `TEST`
-- `DOCUMENTATION`
-- `IMAGE`
-- `VIDEO`
+- `CODE_ONLY`
+- `CODE_REVIEW`
+- `CODE_REVIEW_TEST`
+- `CODE_REVIEW_DOCUMENTATION`
+- `CODE_REVIEW_TEST_DOCUMENTATION`
+- `REVIEW_ONLY`
+- `DOCUMENTATION_ONLY`
 - `GENERAL`
+
+
+### `src/main/kotlin/org/dcac/models/TaskComplexity.kt`
+
+Defines the estimated complexity of a user request.
+
+Current values:
+- `SIMPLE`
+- `MODERATE`
+- `COMPLEX`
+
+
+### `src/main/kotlin/org/dcac/models/WorkflowPlan.kt`
+
+Represents the selected execution workflow.
+
+Current properties:
+- `workflowType`
+- `complexity`
+- `agentIds`
+- `reason`
+
+`agentIds` is completed by `WorkflowPlanner` after the planning model selects a workflow.
 
 
 ### `src/main/kotlin/org/dcac/models/OrchestrationTask.kt`
@@ -383,9 +475,8 @@ Current properties:
 - `id`
 - `title`
 - `instruction`
-- `type`
 
-The task type is currently assigned manually.
+The task no longer needs to manually carry a task type for the active planning-based workflow.
 
 
 ### `src/main/kotlin/org/dcac/models/ExecutionContext.kt`
@@ -431,9 +522,25 @@ Current checks:
 Invalid tasks stop before any agent or Ollama model is called.
 
 
+### `src/main/kotlin/org/dcac/models/TaskType.kt`
+
+Defines task categories used during agent routing.
+`TaskType` is currently transitional and is being phased out as the main routing mechanism.
+
+Current values:
+- `CODE`
+- `REVIEW`
+- `TEST`
+- `DOCUMENTATION`
+- `IMAGE`
+- `VIDEO`
+- `GENERAL`
+
+
 ### `src/main/kotlin/org/dcac/tasks/TaskClassifier.kt`
 
 Provides lightweight keyword-based task classification.
+`TaskClassifier` is transitional and is not the main workflow decision mechanism.
 
 Current behavior:
 - analyzes the user instruction
@@ -445,8 +552,34 @@ The classifier exists but is not yet connected to the current runtime workflow.
 
 ### `src/main/kotlin/org/dcac/tasks/TaskRouter.kt`
 
-Selects agents compatible with an `OrchestrationTask`.
-It calls `supports(task)` on every registered agent and returns all matching agents in registration order.
+Selects concrete agents from planned agent identifiers.
+
+Current behavior:
+- receives ordered agent identifiers from `WorkflowPlan.agentIds`
+- finds matching registered agents by `agent.id`
+- returns selected agents in planned execution order
+
+This allows workflow selection to be handled by `PlanningAgent` and `WorkflowPlanner`, while `TaskRouter` remains responsible for resolving identifiers into concrete agent instances.
+
+
+## Workflow
+
+### `src/main/kotlin/org/dcac/workflow/WorkflowPlanner.kt`
+
+Completes a `WorkflowPlan` produced by the planning step.
+
+Current responsibilities:
+- receive a workflow decision from `PlanningAgent`
+- map `WorkflowType` to ordered agent identifiers
+- return a completed `WorkflowPlan`
+- keep agent execution routing deterministic and testable
+
+Example mappings:
+- `CODE_ONLY` → `code`
+- `CODE_REVIEW` → `code`, `review`
+- `REVIEW_ONLY` → `review`
+
+Future workflow types for tests and documentation are prepared, but dedicated agents are not implemented yet.
 
 
 ## Orchestrator
@@ -459,12 +592,15 @@ Current responsibilities:
 - validate the incoming task
 - stop invalid task execution
 - include validation errors in `OrchestrationResult.errors`
-- route valid tasks
+- ask `PlanningAgent` to select a workflow
+- ask `WorkflowPlanner` to complete the workflow plan
+- route planned agent identifiers through `TaskRouter`
 - execute selected agents sequentially
 - maintain a progressively enriched `ExecutionContext`
 - store each agent output in `ExecutionContext.agentOutputs`
 - collect enriched agent results
 - calculate global success
+- display workflow and execution timing information
 - build a synthesized final response with `ResponseSynthesizer`
 - store the synthesized response in `OrchestrationResult.finalResponse`
 - return an `OrchestrationResult`
@@ -484,6 +620,12 @@ Contains initial application configuration:
 The current Kotlin runtime does not yet load these values dynamically.
 
 
+### `src/main/resources/prompts/planning.txt`
+
+Contains the planning-agent system prompt template.
+This prompt instructs the planning model to return a structured workflow decision instead of implementation code.
+
+
 ### `src/main/resources/prompts/manager.txt`
 
 Contains the initial manager system prompt template.
@@ -492,13 +634,13 @@ This prompt is loaded at runtime by `PromptLoader` and injected into `ManagerAge
 
 ### `src/main/resources/prompts/code.txt`
 
-Contains the initial code-agent system prompt template.
+Contains the code-agent system prompt template.
 This prompt is loaded at runtime by `PromptLoader` and injected into `CodeAgent`.
 
 
 ### `src/main/resources/prompts/review.txt`
 
-Contains the initial review-agent system prompt template.
+Contains the review-agent system prompt template.
 This prompt is loaded at runtime by `PromptLoader` and injected into `ReviewAgent`.
 
 
@@ -612,12 +754,17 @@ Current coverage:
 
 Implemented:
 - modular Kotlin package structure
-- task domain models
+- orchestration task domain model
 - task validation
-- capability-based agent routing
+- planning-based workflow selection with `PlanningAgent`
+- workflow categories with `WorkflowType`
+- workflow complexity levels with `TaskComplexity`
+- workflow plan model with `WorkflowPlan`
+- deterministic workflow completion with `WorkflowPlanner`
+- planned-agent routing with `TaskRouter`
 - central sequential orchestration
 - shared workflow memory through `ExecutionContext.agentOutputs`
-- chained manager → code → review workflow
+- code and review agent execution
 - shared `LlmClient` abstraction
 - structured `LlmResponse`
 - working Ollama HTTP client
@@ -629,22 +776,27 @@ Implemented:
 - orchestration-level validation errors through `OrchestrationResult.errors`
 - prompt loading through `PromptLoader`
 - externalized agent prompts in `src/main/resources/prompts`
-- real Mistral planning response generation
-- real Qwen implementation response generation
-- real DeepSeek review response generation
+- real local planning response generation
+- real local code generation
+- real local review generation when selected
 - enriched agent result aggregation
-- readable console output with agent metadata
+- readable console output with workflow metadata, agent metadata, timings, and model responses
+- progress timers for planning and agent execution
+- final response synthesis through `ResponseSynthesizer`
 - JVM unit test structure under `src/test/kotlin`
 - fake test utilities for tasks, LLM clients, and agents
-- unit tests for validators, agents, and orchestrator behavior
-- successful Gradle test execution
-- successful end-to-end local execution
+- unit tests for validators, agents, synthesis, and orchestrator behavior
+- successful local execution through Ollama
 
 Current limitations:
-- the manager creates a plan but does not yet dynamically decide which agents should run
-- `TaskRouter` still controls agent selection through static support rules
-- task classification is not connected
-- configuration is not loaded dynamically from `application.properties`
+- planning is currently performed by a local LLM and can be slow for simple requests
+- a deterministic fast-path planner for obvious workflows is not implemented yet
+- domain-specific prompt selection is not implemented yet
+- prompts are still global rather than specialized by technical domain
+- Room-specific code generation and review still need stronger framework-specific guardrails
+- test and documentation workflow types exist, but dedicated agents are not implemented yet
+- `TaskType` and `TaskClassifier` are transitional and may still exist during refactoring
+- configuration is not fully loaded dynamically from `application.properties`
 - generated code is not written to files
 - retry and fallback strategies are not implemented
 - client request timeouts are not configured
@@ -655,11 +807,16 @@ Current limitations:
 - final response synthesis is implemented, but it is currently deterministic and may duplicate detailed agent content
 
 Planned next:
-1. Improve final response formatting and reduce duplicated agent content.
-2. Load Ollama configuration from `application.properties`.
-3. Add retry, timeout, and fallback strategies.
-4. Check model availability before generation.
-5. Wire `TaskClassifier` into the main workflow.
-6. Add generated file support.
-7. Add ComfyUI integration.
-8. Add asynchronous or parallel execution where appropriate.
+1. Add domain-specific prompt selection with `PromptSelector`.
+2. Add specialized prompts for Room, ViewModel, UI, tests, documentation, and general code.
+3. Add Room-specific generation and review guardrails.
+4. Add a deterministic fast-path planner for obvious workflow decisions.
+5. Reduce planning latency for simple requests.
+6. Add a future `TestAgent`.
+7. Add a future `DocumentationAgent`.
+8. Improve final response formatting and reduce duplicated agent content.
+9. Add generated file support.
+10. Add retry, timeout, and fallback strategies.
+11. Check model availability before generation.
+12. Add ComfyUI integration.
+13. Add asynchronous or parallel execution where appropriate.

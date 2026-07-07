@@ -1,17 +1,17 @@
 # KotlinAiOrchestrator - Synthesis Overview
 
-## Summary
+## 📌 Summary
 
-The `synthesis` package contains components responsible for building a final user-facing response from agent results.
-
+The `synthesis` package contains components responsible for building a final user-facing response from executable agent results.
 Its purpose is to transform separated agent outputs into one consolidated response that can be displayed to the user.
 
 Current component:
 - `ResponseSynthesizer`
 
+
 ## `ResponseSynthesizer`
 
-`ResponseSynthesizer` builds the final response after agent execution.
+`ResponseSynthesizer` builds the final response after executable agent execution.
 
 Current input:
 - `OrchestrationTask`
@@ -25,40 +25,53 @@ Current behavior:
 - if one or more agents failed, it returns a failure-oriented response listing failed agents and their error messages
 - if all agents succeeded, it builds a final response containing:
   - task title
-  - manager plan when available
   - generated implementation when available
   - review output when available
 
-## Current Workflow
+The planning decision is currently used by the orchestrator to select the workflow, but it is not yet included as a structured section in the synthesized final response.
 
-1. `AiOrchestrator` executes selected agents.
-2. Each agent returns an `AgentResult`.
-3. `AiOrchestrator` passes the task and collected agent results to `ResponseSynthesizer`.
-4. `ResponseSynthesizer` builds the final user-facing response.
-5. The response is stored in `OrchestrationResult.finalResponse`.
-6. `App.kt` displays the final response before separated developer details.
+
+## 🔁 Current Workflow
+
+1. `AiOrchestrator` validates the task.
+2. `PlanningAgent` selects the workflow.
+3. `WorkflowPlanner` completes the workflow plan.
+4. `AiOrchestrator` executes selected executable agents.
+5. Each executable agent returns an `AgentResult`.
+6. `AiOrchestrator` passes the task and collected agent results to `ResponseSynthesizer`.
+7. `ResponseSynthesizer` builds the final user-facing response.
+8. The response is stored in `OrchestrationResult.finalResponse`.
+9. `App.kt` displays the final response before separated developer details.
+
 
 ## Current Benefits
 
 - Users get one consolidated response instead of only separated agent outputs.
 - Developer details are still preserved through individual `AgentResult` entries.
 - Agent failures can be summarized clearly in the final response.
-- The synthesis step is separated from orchestration and agent logic.
+- The synthesis step is separated from orchestration, planning, and agent logic.
+- The current deterministic synthesis does not require an additional model call.
 
-## Current Limitations
+
+## ⚠️ Current Limitations
 
 - The synthesis is deterministic and template-based.
 - It may duplicate detailed content already shown in separated agent responses.
 - It does not yet summarize or compress long model outputs.
 - It does not use an LLM to produce a more natural final answer.
 - It does not yet support structured sections beyond simple text formatting.
+- It does not yet include workflow metadata such as selected workflow, complexity, planning reason, or timings.
+- It does not yet include generated artifact references.
 
-## Future Improvements
+
+## 🚀 Future Improvements
 
 - improve formatting and reduce duplicated content
 - add structured response sections
 - add configurable synthesis templates
-- support task-type-specific synthesis
+- support workflow-specific synthesis
 - summarize long agent outputs
+- include selected workflow and planning metadata when useful
+- include execution duration and model metadata
 - include generated artifact references
 - optionally add an LLM-based final synthesis agent

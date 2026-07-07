@@ -6,8 +6,6 @@ import org.dcac.client.LlmClient
 import org.dcac.models.ExecutionContext
 // Import the task model received by this agent.
 import org.dcac.models.OrchestrationTask
-// Import the task categories used to decide if this agent can handle a task.
-import org.dcac.models.TaskType
 
 /**
  * Specialized agent for code and quality reviews.
@@ -19,7 +17,7 @@ class ReviewAgent(
     private val llmClient: LlmClient,
     private val systemPrompt: String,
     // Local model used by the review agent.
-    private val model: String = "deepseek-coder:6.7b"
+    private val model: String = "deepseek-coder-v2:16b"
 ) : Agent {
     // Stable identifier used by the orchestrator and final results.
     override val id: String = "review"
@@ -59,10 +57,10 @@ class ReviewAgent(
         """.trimIndent()*/
 
     // Decide whether the ReviewAgent should participate in the given task.
-    override fun supports(task: OrchestrationTask): Boolean {
+    /*override fun supports(task: OrchestrationTask): Boolean {
         // Accept tasks where review is useful: review, code, tests, or general tasks.
         return task.type in setOf(TaskType.REVIEW, TaskType.CODE, TaskType.TEST, TaskType.GENERAL)
-    }
+    }*/
 
     // Execute the task and return the ReviewAgent result.
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {

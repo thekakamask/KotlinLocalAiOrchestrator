@@ -5,6 +5,7 @@ import org.dcac.fakeData.FakeTasks
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class ResponseSynthesizerTest {
 
@@ -37,11 +38,11 @@ class ResponseSynthesizerTest {
         assertContains(response, "The orchestration completed successfully.")
         assertContains(response, "Task:")
         assertContains(response, "Create domain class")
-        assertContains(response, "Plan:")
-        assertContains(response, "manager plan")
+        assertFalse(response.contains("Plan:"))
+        assertFalse(response.contains("manager plan"))
         assertContains(response, "Implementation:")
         assertContains(response, "generated code")
-        assertContains(response, "Review:")
+        assertContains(response, "Review summary:")
         assertContains(response, "review result")
     }
 

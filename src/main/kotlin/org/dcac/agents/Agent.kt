@@ -16,7 +16,7 @@ interface Agent {
     val id: String
 
     // Return true when this agent is able to process the given task.
-    fun supports(task: OrchestrationTask): Boolean
+    //fun supports(task: OrchestrationTask): Boolean
 
     // Execute the task with the provided context and return a structured agent result.
     fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult

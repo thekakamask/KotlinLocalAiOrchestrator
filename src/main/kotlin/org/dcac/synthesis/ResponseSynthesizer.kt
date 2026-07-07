@@ -12,7 +12,6 @@ class ResponseSynthesizer {
         task: OrchestrationTask,
         results: List<AgentResult>
     ): String {
-        val managerOutput = results.firstOrNull { it.agentId == "manager" }?.output
         val codeOutput = results.firstOrNull { it.agentId == "code" }?.output
         val reviewOutput = results.firstOrNull { it.agentId == "review" }?.output
         val failedAgents = results.filter { !it.success }
@@ -41,12 +40,6 @@ class ResponseSynthesizer {
             appendLine("Task:")
             appendLine(task.title)
 
-            if (!managerOutput.isNullOrBlank()) {
-                appendLine()
-                appendLine("Plan:")
-                appendLine(managerOutput)
-            }
-
             if (!codeOutput.isNullOrBlank()) {
                 appendLine()
                 appendLine("Implementation:")
@@ -55,7 +48,7 @@ class ResponseSynthesizer {
 
             if (!reviewOutput.isNullOrBlank()) {
                 appendLine()
-                appendLine("Review:")
+                appendLine("Review summary:")
                 appendLine(reviewOutput)
             }
         }.trim()

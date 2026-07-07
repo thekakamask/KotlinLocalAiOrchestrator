@@ -1,11 +1,14 @@
+/*
 package org.dcac.tasks
 
 import org.dcac.models.TaskType
 
+*/
 /**
  * Lightweight keyword-based classifier used as a first routing heuristic.
  * It can later be replaced by an LLM-based or rules-engine classifier.
- */
+ *//*
+
 class TaskClassifier {
     fun classify(instruction: String): TaskType {
         val text = instruction.lowercase()
@@ -21,3 +24,4 @@ class TaskClassifier {
     }
 }
 
+*/
