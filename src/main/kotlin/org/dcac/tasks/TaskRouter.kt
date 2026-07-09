@@ -10,19 +10,18 @@ class TaskRouter(
     private val agents: List<Agent>
 ) {
 
-    // Existing routing strategy based on agent support rules.
-    /*fun route(task: OrchestrationTask): List<Agent> {
-        return agents.filter { agent ->
-            agent.supports(task)
-        }
-    }*/
-
     // New routing strategy based on a planned ordered list of agent identifiers.
     fun route(agentIds: List<String>): List<Agent> {
         return agentIds.mapNotNull { requestedAgentId ->
-            agents.firstOrNull { agent ->
+            val agent = agents.firstOrNull { agent ->
                 agent.id == requestedAgentId
             }
+
+            if (agent == null) {
+                println("Skipped planned agent: $requestedAgentId is not registered")
+            }
+
+            agent
         }
     }
 }

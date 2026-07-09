@@ -53,15 +53,31 @@ The planning decision is currently used by the orchestrator to select the workfl
 - The current deterministic synthesis does not require an additional model call.
 
 
+## 🧪 Current Test Coverage
+
+`ResponseSynthesizer` is covered by JVM unit tests.
+
+Current tested scenarios:
+- returns a clear message when no agent result was produced
+- builds a successful final response when all executable agents succeed
+- includes implementation output when a `code` result exists
+- includes review output when a `review` result exists
+- does not expose legacy manager planning output in the final response
+- builds a failure-oriented final response when one or more agents fail
+- displays `Unknown error` when a failed agent has no error message
+
+
 ## ⚠️ Current Limitations
 
 - The synthesis is deterministic and template-based.
 - It may duplicate detailed content already shown in separated agent responses.
 - It does not yet summarize or compress long model outputs.
 - It does not use an LLM to produce a more natural final answer.
-- It does not yet support structured sections beyond simple text formatting.
-- It does not yet include workflow metadata such as selected workflow, complexity, planning reason, or timings.
+- It does not yet support rich structured sections beyond simple text formatting.
+- It does not yet include workflow metadata such as selected workflow, complexity, planning reason, selected prompt domain, prompt path, or timings.
 - It does not yet include generated artifact references.
+- It only formats currently known agent outputs such as code and review results.
+- Future test, documentation, file-writing, or media-agent outputs will require dedicated synthesis formatting.
 
 
 ## 🚀 Future Improvements

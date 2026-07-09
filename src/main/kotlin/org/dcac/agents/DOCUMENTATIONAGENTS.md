@@ -39,9 +39,8 @@ Instead:
 
 The `Agent` interface defines the common contract implemented by every specialized agent.
 
-It requires each agent to expose:
-- `id` → unique identifier used in results and logs
-- `supports(task)` → indicates whether the agent can process a task
+It requires each executable agent to expose:
+- `id` → unique identifier used in results, logs, and planned routing
 - `run(task, context)` → executes the task and returns an `AgentResult`
 
 The `run()` function receives:
@@ -57,7 +56,7 @@ For example:
 - testing agents may execute Gradle commands
 - file agents may create or modify local files
 
-Its purpose is to support polymorphism, extensibility, and dynamic task routing.
+Its purpose is to support polymorphism, extensibility, and planned agent routing.
 
 
 ### `AgentResult`
@@ -139,11 +138,12 @@ Current capabilities:
 - complexity estimation
 - planning reason generation
 - structured planning response parsing
+- fallback workflow selection when planning fails
 
 Current limitations:
 - planning is still performed by a local LLM and can be slow for simple requests
 - obvious workflow decisions may later be handled by deterministic Kotlin code
-- invalid or malformed planning JSON still requires robust fallback handling
+- invalid or malformed planning JSON is handled with a fallback workflow
 
 
 ### `ManagerAgent`
@@ -184,15 +184,23 @@ Current configuration:
 - role → implementation agent
 - local model → Qwen 2.5 Coder 14B candidate
 - backend → `LlmClient`
-- system prompt → loaded from `src/main/resources/prompts/code.txt`
+- prompt loading → `PromptLoader`
+- prompt selection → `PromptSelector`
 
-Its system prompt asks the model to:
+Before generation, `CodeAgent` detects the technical domain of the user instruction and loads the matching code prompt.
+
+Examples:
+- model/entity request → `prompts/code/model.txt`
+- Room request → `prompts/code/room.txt`
+- Compose UI request → `prompts/code/compose_ui.txt`
+
+Its selected prompt asks the model to:
 - generate clean, valid, idiomatic, implementation-ready code
 - prioritize the original user request
 - respect valid target-language syntax
 - respect target-language and framework conventions
 - keep the implementation focused and maintainable
-- avoid unnecessary boilerplate and speculative architecture
+- follow domain-specific rules when a specialized prompt is selected
 - state assumptions when necessary
 
 `CodeAgent` receives:
@@ -200,13 +208,28 @@ Its system prompt asks the model to:
 - the current `ExecutionContext`
 - previous agent outputs when available
 
-It sends an enriched prompt to the configured code model through `LlmClient.generate()`.
+It sends a generated user prompt and the selected system prompt to the configured code model through `LlmClient.generate()`.
 It returns the generated implementation inside an `AgentResult`.
 If the LLM client fails, `CodeAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
 Its output is stored by `AiOrchestrator` in:
-ExecutionContext.agentOutputs["code"]
-- structured code generation output
+`ExecutionContext.agentOutputs["code"]`
+
+Current capabilities:
+- real local code generation
+- dynamic domain-specific prompt selection
+- language-aware implementation
+- context-aware implementation
+- assumption explanation
+- code and technical draft generation
+
+Possible future responsibilities:
+- inspect the current project structure
+- generate source files
+- generate tests
+- refactor existing code
+- return structured generated artifacts
+- use workflow metadata instead of detecting prompt domain independently
 
 
 ### `ReviewAgent`
@@ -218,15 +241,24 @@ Current configuration:
 - role → code review agent
 - local model → DeepSeek Coder V2 16B candidate
 - backend → `LlmClient`
-- system prompt → loaded from `src/main/resources/prompts/review.txt`
+- prompt loading → `PromptLoader`
+- prompt selection → `PromptSelector`
 
-Its system prompt asks the model to:
+Before review, `ReviewAgent` detects the technical domain of the user instruction and loads the matching review prompt.
+
+Examples:
+- model/entity request → `prompts/review/model.txt`
+- Room request → `prompts/review/room.txt`
+- Compose UI request → `prompts/review/compose_ui.txt`
+
+Its selected prompt asks the model to:
 - review generated code against the original user request
 - check target-language syntax and idioms
 - detect confirmed issues
 - separate optional improvements from real problems
 - separate speculative risks from confirmed issues
 - avoid inventing unsupported language behavior
+- check domain-specific correctness when a specialized prompt is selected
 - check maintainability, correctness, testability, and security when relevant
 
 `ReviewAgent` receives:
@@ -234,15 +266,16 @@ Its system prompt asks the model to:
 - the current `ExecutionContext`
 - the generated code from `ExecutionContext.agentOutputs["code"]` when available
 
-It sends an enriched review prompt to the configured review model through `LlmClient.generate()`.
+It sends a generated review prompt and the selected system prompt to the configured review model through `LlmClient.generate()`.
 It returns the generated review inside an `AgentResult`.
 If the LLM client fails, `ReviewAgent` catches the exception and returns a failed `AgentResult` with an `errorMessage`.
 
 Current capabilities:
 - real local code review
+- dynamic domain-specific prompt selection
 - review of the actual `CodeAgent` output
 - consistency check against the original instruction
-- structured review output
+- domain-specific review guidance
 
 Possible future responsibilities:
 - return structured findings
@@ -251,7 +284,7 @@ Possible future responsibilities:
 - validate architecture decisions
 - approve or reject generated artifacts
 - trigger a correction loop with `CodeAgent`
-- use domain-specific review prompts
+- use workflow metadata instead of detecting prompt domain independently
 
 
 ## ⚙️ Current Agent Workflow
@@ -264,14 +297,16 @@ Current high-level flow:
 3. `PlanningAgent` returns a workflow type, complexity level, and reason.
 4. `WorkflowPlanner` converts the selected workflow into ordered agent identifiers.
 5. `TaskRouter` resolves the planned identifiers into concrete agent instances.
-6. `AiOrchestrator` executes selected agents sequentially.
-7. `CodeAgent` generates implementation output when selected.
-8. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
-9. `ReviewAgent` reviews the generated code when selected.
-10. Each executable agent returns an enriched `AgentResult`.
-11. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
-12. The results are aggregated into an `OrchestrationResult`.
-13. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
+6. `CodeAgent` and `ReviewAgent` detect the prompt domain for the current task when they run.
+8. `PromptSelector` resolves the matching code or review prompt path.
+9. `PromptLoader` loads the selected prompt for the current agent.
+10. `CodeAgent` generates implementation output when selected.
+11. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
+12. `ReviewAgent` reviews the generated code when selected.
+13. Each executable agent returns an enriched `AgentResult`.
+14. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
+15. The results are aggregated into an `OrchestrationResult`.
+16. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
 
 Example workflow mappings:
 - `CODE_ONLY` → `CodeAgent`
@@ -299,12 +334,23 @@ The common `Agent` interface can support additional implementations, such as:
 
 These future agents may use Ollama, ComfyUI, Gradle, the local filesystem, or other offline tools while keeping the same orchestration contract.
 
-Future improvements may also include specialized prompt variants for the same agent type, such as:
-- general code prompt
-- Room code prompt
-- ViewModel code prompt
-- UI code prompt
-- test code prompt
-- general review prompt
-- Room review prompt
-- ViewModel review prompt
+Current prompt specialization includes code and review prompt variants for multiple technical domains, such as:
+- general
+- model
+- Room
+- Firebase
+- Retrofit
+- DataStore
+- synchronization
+- dependency injection
+- ViewModel
+- Compose UI
+- tests
+- documentation
+- utilities
+
+Future improvements may include:
+- documentation-agent prompt families
+- test-agent prompt families
+- centralized prompt domain selection in workflow metadata
+- stronger structured review output enforcement

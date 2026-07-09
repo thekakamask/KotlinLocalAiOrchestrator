@@ -186,9 +186,12 @@ The current client workflow is:
 7. Kotlinx Serialization converts the JSON into `OllamaGenerateResponse`.
 8. If the request or response handling fails, `OllamaClient` throws an `LlmClientException`.
 9. If generation succeeds, `OllamaClient` creates an `LlmResponse`.
-10. The agent reads `LlmResponse.actualModel` and `LlmResponse.text`.
-11. Executable agents store these values inside an enriched `AgentResult`.
-12. If the client throws an exception, executable agents catch it and return a failed `AgentResult`.
+10. The caller reads `LlmResponse.actualModel` and `LlmResponse.text`.
+11. `PlanningAgent` uses the response text to build a workflow decision.
+12. Executable agents use the response values to build an enriched `AgentResult`.
+13. If the client throws an exception, the caller handles it according to its role.
+14. `PlanningAgent` falls back to a default workflow when generation or parsing fails.
+15. Executable agents catch client failures and return a failed `AgentResult`.
 
 
 ## ⚠️ Current Limitations
@@ -197,14 +200,14 @@ The current client integration successfully generates local model responses, but
 - HTTP requests are synchronous and blocking
 - request timeout configuration is not implemented
 - retry strategies are not implemented
-- connection failures are wrapped into `LlmClientException`, but retry and fallback strategies are not implemented
+- connection failures are wrapped into `LlmClientException`; planning has a fallback workflow, but client-level retry and fallback strategies are not implemented
 - model availability is not checked before generation
 - streaming responses are not supported
 - cancellation is not supported
 - token usage is not stored
 - execution duration is not stored
 - detailed Ollama metadata is ignored
-- client errors are converted into failed agent results, but advanced recovery strategies are not implemented
+- client errors are converted into failed executable agent results or planning fallback decisions, but advanced recovery strategies are not implemented
 - configuration is not yet loaded dynamically from `application.properties`
 - model configuration is partially manual and still evolving while planning, code, and review models are being tested
 

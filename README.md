@@ -41,25 +41,22 @@ The entire ecosystem is designed to run locally and offline.
 
 ## ✅ **LAST MAJOR UPDATES (see [UPDATES.md](./UPDATES.md) for details)**
 
-   - Added a planning-based orchestration step with `PlanningAgent`
-   - Added `planning.txt` as the dedicated prompt for workflow selection
-   - Added `WorkflowType`, `TaskComplexity`, and `WorkflowPlan`
-   - Added `WorkflowPlanner` to deterministically resolve workflow decisions into ordered agent pipelines
-   - Updated `AiOrchestrator` to run validation, planning, workflow completion, routing, agent execution, and synthesis
-   - Updated `TaskRouter` to select agents by planned agent identifiers
-   - Started moving away from manually selected `TaskType` routing
-   - Added runtime progress timers for planning and agent execution
-   - Added total orchestration duration and per-agent duration logs
-   - Tested larger local models through Ollama, including Qwen 2.5 Coder 14B, Qwen 3 8B/14B, and DeepSeek Coder V2 16B
-   - Confirmed local GPU usage during Ollama inference with `nvidia-smi`
-   - Improved planning, code, and review prompts with stronger workflow and review guardrails
+   - Added domain-specific prompt selection with `PromptDomain` and `PromptSelector`
+   - Added specialized code and review prompt families under `src/main/resources/prompts/code` and `src/main/resources/prompts/review`
+   - Added specialized prompts for general code, models, Room, Firebase, Retrofit, DataStore, synchronization, dependency injection, ViewModel, Compose UI, tests, documentation, and utilities
+   - Updated `CodeAgent` and `ReviewAgent` to dynamically load the correct prompt at runtime for each task
+   - Added runtime logs showing selected prompt domain and prompt path
+   - Added planning fallback behavior when the planning model fails or returns invalid workflow data
+   - Updated `TaskRouter` to report missing planned agents instead of silently ignoring them
+   - Realigned the JVM test suite with the planning and prompt-selection architecture
+   - Added tests for prompt selection, planning fallback, workflow planning, planned routing, agent prompt loading, and orchestrator execution
+   - Confirmed the full JVM test suite passes successfully
 
 
 ## ❌ **NEXT UPDATES**
 
-   - Add domain-specific prompt selection with a `PromptSelector`
-   - Add specialized prompts for Room, ViewModel, UI, tests, documentation, and general code workflows
-   - Improve Room-specific code generation and review rules
+   - Improve specialized review prompt output-format enforcement
+   - Centralize prompt domain detection in workflow metadata or execution context
    - Add a deterministic fast-path planner for obvious workflow decisions
    - Reduce planning latency for simple requests
    - Add a future `TestAgent`
@@ -102,7 +99,7 @@ The entire ecosystem is designed to run locally and offline.
       - ❌ **PLANNED** Documentation generation
       - ❌ **PLANNED** Performance analysis
       - 🟩 **IN PROGRESS** Architecture design assistance
-      - ❌ **PLANNED** Domain-specific prompt selection
+      - 🟩 **IN PROGRESS** Domain-specific prompt selection
       - ❌ **PLANNED** Product ideation support
 
    - 🎨 **Generative media**
@@ -124,7 +121,9 @@ The entire ecosystem is designed to run locally and offline.
       - 🟩 **IN PROGRESS** Agent success and failure tests
       - 🟩 **IN PROGRESS** Orchestrator aggregation tests
       - 🟩 **IN PROGRESS** Final response synthesis tests
-      - ❌ **PLANNED** Workflow planning tests
+      - 🟩 **IN PROGRESS** Workflow planning tests
+      - 🟩 **IN PROGRESS** Prompt selection tests
+      - 🟩 **IN PROGRESS** Planned routing tests
       - ❌ **PLANNED** Client integration tests
       - ❌ **PLANNED** End-to-end workflow tests
       
@@ -158,10 +157,10 @@ The entire ecosystem is designed to run locally and offline.
    - **org.dcac.tasks** - task validation and agent routing components
    - **org.dcac.orchestrator** - central orchestration workflow coordinating validation, planning, workflow completion, routing, chained execution, context sharing, result aggregation, and validation error propagation
    - **org.dcac.synthesis** - final response synthesis components used to build user-facing orchestration output
-   - **org.dcac.prompts** - prompt loading utilities used to read agent system prompts from resources
+   - **org.dcac.prompts** - prompt loading and prompt selection utilities used to choose domain-specific agent prompts
    - **org.dcac.utils** - runtime utilities such as duration formatting and progress timers
-   - **src/main/resources** - application configuration and externalized prompt templates
-   - **src/test/kotlin** - JVM unit tests and fake test utilities for validators, agents, synthesis, and orchestrator behavior
+   - **src/main/resources** - application configuration and externalized planning, code, and review prompt templates
+   - **src/test/kotlin** - JVM unit tests and fake test utilities for validators, agents, prompt selection, workflow planning, routing, synthesis, and orchestrator behavior
    - **ARCHITECTURE.md** - detailed documentation of the current Kotlin orchestration structure
 
 
@@ -178,7 +177,9 @@ The entire ecosystem is designed to run locally and offline.
    - `TaskRouter` selects the concrete agent instances from the planned agent identifiers
    - `AiOrchestrator` logs the selected workflow, complexity, planning reason, selected agents, and execution timings
    - Selected agents are executed sequentially
-   - Each agent receives the original task and the current `ExecutionContext`
+   - `CodeAgent` and `ReviewAgent` detect the prompt domain from the current task instruction
+   - `PromptSelector` resolves the correct domain-specific prompt path
+   - `PromptLoader` loads the selected prompt for the current agent execution
    - `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`
    - `CodeAgent` generates implementation-ready code through the local code model
    - `ReviewAgent`, when selected, reviews the generated code using previous agent output from the execution context
@@ -201,9 +202,9 @@ The project currently contains a working local planning-based orchestration pipe
 
    - Planning is currently performed by a local LLM and can be slow for simple requests
    - A deterministic fast-path planner for obvious workflows is not implemented yet
-   - Domain-specific prompt selection is not implemented yet
-   - Code and review prompts are still global rather than specialized by technical domain
-   - Room-specific generation and review still need stronger framework-specific guardrails
+   - Prompt domain detection is currently keyword-based
+   - `CodeAgent` and `ReviewAgent` currently detect prompt domain independently
+   - Some specialized review prompts still need stronger output-format enforcement
    - Test and documentation workflow types exist as planning targets, but dedicated agents are not implemented yet
    - Final response synthesis is implemented, but it is deterministic and may duplicate detailed agent content
    - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
@@ -213,7 +214,7 @@ The project currently contains a working local planning-based orchestration pipe
    - Model availability is not checked before generation
    - ComfyUI integration is not implemented in Kotlin yet
    - Agent execution is currently sequential
-   - Unit tests exist for validation, agents, synthesis, and orchestration behavior, but client integration and end-to-end tests are not implemented yet
+   - Unit tests exist for validation, agents, prompt selection, workflow planning, routing, synthesis, and orchestration behavior, but client integration and end-to-end tests are not implemented yet
 
 
 ## 🚀 **How to Use**

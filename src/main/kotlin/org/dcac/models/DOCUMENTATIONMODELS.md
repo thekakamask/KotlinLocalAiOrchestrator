@@ -3,7 +3,7 @@
 ## 📌 Summary
 
 The `models` package defines the core domain objects used across the entire orchestration system.
-Its role is to provide a shared and standardized data model for all application layers, including agents, task routing, execution workflows, and final result aggregation.
+Its role is to provide a shared and standardized data model for all application layers, including agents, prompt selection, workflow planning, task routing, execution workflows, and final result aggregation.
 This package represents the internal language of the orchestrator. Every major component relies on these models to exchange structured information consistently.
 Its purpose is to centralize domain data and maintain a clean separation between data models, execution logic, and infrastructure.
 
@@ -128,7 +128,31 @@ Current values:
 `TaskComplexity` is selected by `PlanningAgent`.
 
 It is currently used mainly for observability and future workflow decisions.
-It may later influence model selection, prompt selection, test generation, or whether a deterministic fast path is allowed.
+It may later influence model selection, test generation, documentation generation, or whether a deterministic fast path is allowed.
+Prompt selection is currently handled separately through `PromptDomain` and `PromptSelector`.
+
+
+### `PromptDomain`
+
+`PromptDomain` defines the technical domain used to select specialized prompts for executable agents.
+
+Current values:
+- `GENERAL` → default prompt domain
+- `MODEL` → data models, entities, DTOs, value objects, and simple data classes
+- `ROOM` → Android Room, SQLite persistence, DAOs, entities, relations, and database code
+- `FIREBASE` → Firebase, Firestore, collections, documents, and remote data access
+- `RETROFIT` → Retrofit, HTTP APIs, API services, endpoints, and network DTOs
+- `DATASTORE` → Android DataStore preferences and settings persistence
+- `SYNC` → synchronization workflows, upload/download flows, workers, and schedulers
+- `DEPENDENCY_INJECTION` → Hilt, Dagger, modules, bindings, providers, and dependency wiring
+- `VIEWMODEL` → Android ViewModels, UI state, StateFlow, lifecycle-aware presentation logic
+- `COMPOSE_UI` → Jetpack Compose, Material 3, screens, composables, and UI components
+- `TEST` → test generation, test doubles, assertions, and edge-case validation
+- `DOCUMENTATION` → documentation generation, README updates, and technical explanations
+- `UTILITY` → utility functions, helpers, formatters, validators, and small shared components
+
+`PromptDomain` is used by `PromptSelector` to choose the appropriate code or review prompt for the current task.
+Its purpose is to keep prompt specialization separate from workflow selection.
 
 
 ### `WorkflowPlan`
@@ -148,6 +172,9 @@ Current workflow usage:
 - `AiOrchestrator` executes selected agents in the planned order
 
 Its purpose is to make workflow selection explicit, inspectable, and deterministic after the planning decision.
+`WorkflowPlan` does not currently store prompt domain information.
+Prompt domain detection is currently performed by `CodeAgent` and `ReviewAgent` during execution.
+This may later be centralized in workflow metadata or execution context.
 
 
 ### `OrchestrationResult`
@@ -171,6 +198,7 @@ Possible future properties:
 - selected workflow metadata
 - structured final response sections
 - generated artifact references
+- prompt domain diagnostics
 
 Its purpose is to provide a unified view of the complete orchestration execution.
 This model is the final object returned to the application entry point and will later be returned to a user-facing interface or API.

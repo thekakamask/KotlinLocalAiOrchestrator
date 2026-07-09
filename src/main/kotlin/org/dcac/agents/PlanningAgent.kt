@@ -27,21 +27,34 @@ class PlanningAgent(
 ) {
     // Ask the model to select a workflow and convert the response into a WorkflowPlan.
     fun plan(task: OrchestrationTask): WorkflowPlan {
-        val llmResponse = llmClient.generate(
-            model = model,
-            systemPrompt = systemPrompt,
-            userPrompt = task.instruction
-        )
+       return try {
+           val llmResponse = llmClient.generate(
+               model = model,
+               systemPrompt = systemPrompt,
+               userPrompt = task.instruction
+           )
 
-        val decision = json.decodeFromString<PlanningDecision>(
-            llmResponse.text
-        )
+           val decision = json.decodeFromString<PlanningDecision>(
+               llmResponse.text
+           )
 
-        return WorkflowPlan(
-            workflowType = WorkflowType.valueOf(decision.workflowType),
-            complexity = TaskComplexity.valueOf(decision.complexity),
-            agentIds = emptyList(),
-            reason = decision.reason
-        )
+           WorkflowPlan(
+               workflowType = WorkflowType.valueOf(decision.workflowType.trim().uppercase()),
+               complexity = TaskComplexity.valueOf(decision.complexity.trim().uppercase()),
+               agentIds = emptyList(),
+               reason = decision.reason.ifBlank {
+                   "Workflow selected by planning agent."
+               }
+           )
+       } catch (exception : Exception) {
+           println("Planning failed, using fallback workflow: ${exception.message ?: "unknown planning error"}")
+
+           WorkflowPlan(
+               workflowType = WorkflowType.CODE_REVIEW,
+               complexity = TaskComplexity.MODERATE,
+               agentIds = emptyList(),
+               reason = "Fallback workflow selected because planning failed: ${exception.message ?: "unknown planning error"}"
+           )
+       }
     }
 }

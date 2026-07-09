@@ -4,8 +4,11 @@ import org.dcac.client.LlmClientException
 import org.dcac.fakeData.FakeLlmClient
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.ExecutionContext
-import org.dcac.models.TaskType
+import org.dcac.models.OrchestrationTask
+import org.dcac.prompts.PromptLoader
+import org.dcac.prompts.PromptSelector
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -13,135 +16,131 @@ import kotlin.test.assertTrue
 
 class CodeAgentTest {
 
-    @Test
-    fun supports_withCodeTask_returnsTrue() {
-        val agent = CodeAgent(
-            llmClient = FakeLlmClient(),
-            systemPrompt = "code prompt"
+    private fun createAgent(fakeLlmClient: FakeLlmClient): CodeAgent {
+        return CodeAgent(
+            llmClient = fakeLlmClient,
+            promptLoader = PromptLoader(),
+            promptSelector = PromptSelector()
         )
-
-        val supportsTask = agent.supports(FakeTasks.validCodeTask())
-
-        assertTrue(supportsTask)
     }
 
-    @Test
-    fun supports_withReviewTask_returnsFalse() {
-        val agent = CodeAgent(
-            llmClient = FakeLlmClient(),
-            systemPrompt = "code prompt"
-        )
-
-        val reviewTask = FakeTasks.validCodeTask().copy(type = TaskType.REVIEW)
-
-        val supportsTask = agent.supports(reviewTask)
-
-        assertFalse(supportsTask)
-    }
 
     @Test
     fun run_whenLlmClientSucceeds_returnsSuccessfulAgentResult() {
-        val agent = CodeAgent(
-            llmClient = FakeLlmClient(
-                responseText = "generated code",
-                actualModel = "qwen2.5-coder:7b"
-            ),
-            systemPrompt = "code prompt"
+        val fakeLlmClient = FakeLlmClient(
+            responseText = "generated code",
+            actualModel = "qwen2.5-coder:14b"
         )
 
-        val context = ExecutionContext(
-            projectPath = ".",
-            agentOutputs = mapOf("manager" to "manager plan")
-        )
+        val agent = createAgent(fakeLlmClient)
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = context
+            context = ExecutionContext(projectPath = ".")
         )
 
         assertTrue(result.success)
         assertEquals("code", result.agentId)
         assertEquals("Implementation agent", result.role)
-        assertEquals("qwen2.5-coder:7b", result.model)
+        assertEquals("qwen2.5-coder:14b", result.model)
         assertEquals("generated code", result.output)
         assertNull(result.errorMessage)
     }
 
     @Test
-    fun run_whenManagerPlanIsMissing_returnsSuccessfulAgentResult() {
-        val agent = CodeAgent(
-            llmClient = FakeLlmClient(
-                responseText = "generated code without manager plan",
-                actualModel = "qwen2.5-coder:7b"
-            ),
-            systemPrompt = "code prompt"
-        )
+    fun run_withModelTask_usesModelCodePrompt() {
+        val fakeLlmClient = FakeLlmClient()
+        val agent = createAgent(fakeLlmClient)
 
-        val context = ExecutionContext(projectPath = ".")
-
-        val result = agent.run(
+        agent.run(
             task = FakeTasks.validCodeTask(),
-            context = context
+            context = ExecutionContext(projectPath = ".")
         )
 
-        assertTrue(result.success)
-        assertEquals("code", result.agentId)
-        assertEquals("Implementation agent", result.role)
-        assertEquals("qwen2.5-coder:7b", result.model)
-        assertEquals("generated code without manager plan", result.output)
-        assertNull(result.errorMessage)
+        assertContains(
+            fakeLlmClient.lastSystemPrompt ?: "",
+            "model code agent",
+            ignoreCase = true
+        )
+    }
+
+    @Test
+    fun run_withRoomTask_usesRoomCodePrompt() {
+        val fakeLlmClient = FakeLlmClient()
+        val agent = createAgent(fakeLlmClient)
+
+        val roomTask = OrchestrationTask(
+            id = "room-task",
+            title = "Create local order persistence",
+            instruction = "Implement Kotlin Room DAO and SQLite persistence for customer orders."
+        )
+
+        agent.run(
+            task = roomTask,
+            context = ExecutionContext(projectPath = ".")
+        )
+
+        assertContains(
+            fakeLlmClient.lastSystemPrompt ?: "",
+            "Room code agent",
+            ignoreCase = true
+        )
+    }
+
+    @Test
+    fun run_sendsUserInstructionToLlmClient() {
+        val fakeLlmClient = FakeLlmClient()
+        val agent = createAgent(fakeLlmClient)
+
+        agent.run(
+            task = FakeTasks.validCodeTask(),
+            context = ExecutionContext(projectPath = ".")
+        )
+
+        assertContains(
+            fakeLlmClient.lastUserPrompt ?: "",
+            "Create an Order entity."
+        )
     }
 
     @Test
     fun run_whenLlmClientFails_returnsFailedAgentResult() {
-        val agent = CodeAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 exception = LlmClientException("client failed")
-            ),
-            systemPrompt = "code prompt"
-        )
-
-        val context = ExecutionContext(
-            projectPath = ".",
-            agentOutputs = mapOf("manager" to "manager plan")
+            )
         )
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = context
+            context = ExecutionContext(projectPath = ".")
         )
 
         assertFalse(result.success)
         assertEquals("code", result.agentId)
         assertEquals("Implementation agent", result.role)
-        assertEquals("qwen2.5-coder:7b", result.model)
+        assertEquals("qwen2.5-coder:14b", result.model)
         assertEquals("", result.output)
         assertEquals("client failed", result.errorMessage)
     }
 
     @Test
     fun run_whenLlmClientFailsWithoutMessage_returnsUnknownCodeAgentError() {
-        val agent = CodeAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 exception = RuntimeException()
-            ),
-            systemPrompt = "code prompt"
-        )
-
-        val context = ExecutionContext(
-            projectPath = ".",
-            agentOutputs = mapOf("manager" to "manager plan")
+            )
         )
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = context
+            context = ExecutionContext(projectPath = ".")
         )
 
         assertFalse(result.success)
         assertEquals("code", result.agentId)
         assertEquals("Implementation agent", result.role)
-        assertEquals("qwen2.5-coder:7b", result.model)
+        assertEquals("qwen2.5-coder:14b", result.model)
         assertEquals("", result.output)
         assertEquals("Unknown code agent error", result.errorMessage)
     }

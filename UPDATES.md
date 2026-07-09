@@ -419,5 +419,96 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - Generated code is still displayed in the console and not written to project files automatically
 
 
+### 🔹 **Update #8**
+
+  - 🧠 **Domain-specific prompt selection**
+    - Added `PromptDomain` to represent technical domains used for prompt selection
+    - Added `PromptSelector` to detect the most relevant prompt domain from the user instruction
+    - Added domain detection for:
+      - general requests
+      - data models and entities
+      - Android Room persistence
+      - Firebase data access
+      - Retrofit API access
+      - Android DataStore preferences
+      - synchronization workflows
+      - dependency injection
+      - Android ViewModel logic
+      - Jetpack Compose UI
+      - tests
+      - documentation
+      - utilities
+    - Updated `CodeAgent` and `ReviewAgent` to select their system prompt dynamically during execution
+    - Moved from one global code prompt and one global review prompt to domain-specific prompt families
+    - Added runtime logs showing the selected prompt domain and prompt resource path
+
+  - 📝 **Specialized prompt families**
+    - Reorganized code prompts under `src/main/resources/prompts/code`
+    - Reorganized review prompts under `src/main/resources/prompts/review`
+    - Added specialized code and review prompts for:
+      - general code
+      - data models
+      - Room
+      - Firebase
+      - Retrofit
+      - DataStore
+      - synchronization
+      - dependency injection
+      - ViewModel
+      - Compose UI
+      - tests
+      - documentation
+      - utilities
+    - Added Room-specific rules for entities, DAOs, relationships, foreign keys, indexes, `@Embedded`, `@Relation`, and `@Transaction`
+    - Added Android-specific prompt guidance for ViewModel, Compose UI, DataStore, Retrofit, Firebase, synchronization, and dependency injection workflows
+    - Kept prompt specialization agent-specific: code prompts guide implementation, review prompts guide validation
+
+  - 🔀 **Prompt-aware agent execution**
+    - Updated `CodeAgent` to load the appropriate code prompt at runtime based on the current task instruction
+    - Updated `ReviewAgent` to load the appropriate review prompt at runtime based on the current task instruction
+    - Ensured different tasks in the same application run can use different prompts
+    - Confirmed that simple model/entity requests select the `MODEL` prompt domain
+    - Confirmed that Android Room persistence requests select the `ROOM` prompt domain
+
+  - 🛡️ **Planning and routing robustness**
+    - Added fallback behavior to `PlanningAgent`
+    - If planning fails, returns invalid JSON, returns an unknown workflow type, or returns an unknown complexity value, the system now falls back to `CODE_REVIEW` with `MODERATE` complexity
+    - Updated `TaskRouter` to log when a planned agent identifier cannot be resolved to a registered agent
+    - Improved visibility when future workflow steps such as documentation or tests are selected before their agents exist
+
+  - 🧹 **Agent cleanup**
+    - Removed obsolete manager-plan assumptions from active `CodeAgent` and `ReviewAgent` prompts
+    - Cleaned up legacy support-rule behavior after moving away from task-type based routing
+    - Simplified agent execution around the current planning + prompt-selection workflow
+    - Improved prompt-domain and prompt-path observability during runtime
+
+  - 🧪 **Test suite realignment**
+    - Updated fake test utilities to match the new `Agent` contract
+    - Updated `FakeLlmClient` to record requested model, system prompt, user prompt, and generation call count
+    - Updated `CodeAgentTest` for dynamic prompt loading and specialized prompt selection
+    - Updated `ReviewAgentTest` for dynamic prompt loading, generated-code context usage, and specialized prompt selection
+    - Added `PromptSelectorTest` to verify domain detection and prompt-path selection
+    - Added `PlanningAgentTest` to verify valid planning output and fallback planning behavior
+    - Added `WorkflowPlannerTest` to verify workflow-to-agent mappings
+    - Added `TaskRouterTest` to verify planned agent resolution and missing-agent handling
+    - Updated `AiOrchestratorTest` to cover validation, planning, workflow completion, planned routing, agent execution, fallback planning, and context sharing
+    - Confirmed the full JVM test suite passes successfully after the prompt-selection and workflow test updates
+
+  - ✅ **Runtime validation**
+    - Verified that a simple Kotlin entity task selects the `MODEL` prompt domain
+    - Verified that a Room persistence task selects the `ROOM` prompt domain
+    - Verified that Room-specialized prompts improve generated Room code quality
+    - Verified that generated Room code now includes improved relationship modeling, foreign key placement, indexes, and transaction-oriented insertion behavior
+
+  - ⚠️ **Current workflow limitations**
+    - Prompt domain detection is currently keyword-based
+    - Some domain detection rules may need refinement as more real tasks are tested
+    - `CodeAgent` and `ReviewAgent` currently detect the prompt domain independently
+    - Prompt domain selection may later be centralized in workflow metadata or execution context
+    - Review prompts still need stronger output-format enforcement for some specialized domains
+    - Dedicated documentation and test agents are still not implemented
+    - Domain-specific documentation and test prompt families are planned for future dedicated agents
+
+
 ## 🤝 **Contributions**
 Contributions are welcome! Feel free to fork the repository and submit a pull request for new features or bug fixes✅🟩❌.

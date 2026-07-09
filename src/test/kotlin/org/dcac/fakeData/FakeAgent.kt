@@ -7,7 +7,6 @@ import org.dcac.models.OrchestrationTask
 
 class FakeAgent(
     override val id: String,
-    private val supported: Boolean = true,
     private val success: Boolean = true,
     private val output: String = "fake output",
     private val errorMessage: String? = null,
@@ -16,10 +15,6 @@ class FakeAgent(
 
     var runCount: Int = 0
         private set
-
-    override fun supports(task: OrchestrationTask): Boolean {
-        return supported
-    }
 
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
         runCount++

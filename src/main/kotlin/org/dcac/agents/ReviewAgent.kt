@@ -6,6 +6,8 @@ import org.dcac.client.LlmClient
 import org.dcac.models.ExecutionContext
 // Import the task model received by this agent.
 import org.dcac.models.OrchestrationTask
+import org.dcac.prompts.PromptLoader
+import org.dcac.prompts.PromptSelector
 
 /**
  * Specialized agent for code and quality reviews.
@@ -15,58 +17,17 @@ import org.dcac.models.OrchestrationTask
 class ReviewAgent(
     // LLM client used by this agent to generate real model responses.
     private val llmClient: LlmClient,
-    private val systemPrompt: String,
+    private val promptLoader: PromptLoader,
+    private val promptSelector: PromptSelector,
     // Local model used by the review agent.
     private val model: String = "deepseek-coder-v2:16b"
 ) : Agent {
     // Stable identifier used by the orchestrator and final results.
     override val id: String = "review"
 
-    /*// System prompt defining the role and behavior of the review agent.
-    private val systemPrompt: String = """
-        You are the review agent of a local offline AI orchestrator.
-        Your role is to review generated code and identify concrete improvements.
-
-        You must not regenerate the full implementation unless explicitly requested.
-        You must not replace the code agent.
-        You must focus on review, validation, risks, and improvement suggestions.
-
-        Review the generated code using general software engineering best practices:
-        - correctness and expected behavior
-        - readability and maintainability
-        - DRY principle and unnecessary duplication
-        - SOLID principles when object-oriented design is relevant
-        - encapsulation and class responsibility boundaries
-        - composition over inheritance when applicable
-        - error handling and failure cases
-        - edge cases and invalid inputs
-        - security risks such as injection, unsafe deserialization, hardcoded secrets, and uncontrolled file or network access
-        - performance and unnecessary complexity
-        - testability and missing tests
-        - consistency with the original user instruction
-        - consistency with the manager plan
-
-        Your response must be structured as:
-        - Summary
-        - Issues found
-        - Suggested improvements
-        - Missing tests
-        - Final recommendation
-
-        If no major issue is found, say it clearly and only suggest small improvements.
-        """.trimIndent()*/
-
-    // Decide whether the ReviewAgent should participate in the given task.
-    /*override fun supports(task: OrchestrationTask): Boolean {
-        // Accept tasks where review is useful: review, code, tests, or general tasks.
-        return task.type in setOf(TaskType.REVIEW, TaskType.CODE, TaskType.TEST, TaskType.GENERAL)
-    }*/
-
     // Execute the task and return the ReviewAgent result.
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
         return try {
-            // Read the manager output if it already exists in the workflow context.
-            val managerPlan = context.agentOutputs["manager"]
 
             // Read the code output produced by the CodeAgent.
             val generatedCode = context.agentOutputs["code"]
@@ -76,15 +37,22 @@ class ReviewAgent(
              User instruction:
              ${task.instruction}
              
-             Manager plan:
-             ${managerPlan ?: "No manager plan was provided."}
-             
              Generated code to review:
              ${generatedCode ?: "No generated code was provided."}
              
-             Review the generated code based on the original instruction and the manager plan.
+             Review the generated code based on the original instruction.
              Focus on correctness, maintainability, missing requirements, risks, and concrete improvements.
              """.trimIndent()
+
+            val promptDomain = promptSelector.detectDomain(task.instruction)
+
+            val promptPath = promptSelector.reviewPromptPathFor(promptDomain)
+
+            println()
+            println("Review prompt domain: $promptDomain")
+            println("Review prompt path: $promptPath")
+
+            val systemPrompt = promptLoader.loadPrompt(promptPath)
 
             // Ask the configured local LLM model to generate the review response.
             val llmResponse = llmClient.generate(

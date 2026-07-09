@@ -8,6 +8,7 @@ import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
 import org.dcac.orchestrator.AiOrchestrator
 import org.dcac.prompts.PromptLoader
+import org.dcac.prompts.PromptSelector
 import org.dcac.synthesis.ResponseSynthesizer
 import org.dcac.tasks.TaskRouter
 import org.dcac.tasks.TaskValidator
@@ -31,11 +32,11 @@ fun main() {
     // Create the prompt loader used to read agent system prompts from resources.
     val promptLoader = PromptLoader()
 
+    val promptSelector = PromptSelector()
+
     // Load the system prompts used by each specialized agent.
     //val managerPrompt = promptLoader.loadPrompt("prompts/planning.txt")
     val planningPrompt = promptLoader.loadPrompt("prompts/planning.txt")
-    val codePrompt = promptLoader.loadPrompt("prompts/code.txt")
-    val reviewPrompt = promptLoader.loadPrompt("prompts/review.txt")
 
     val planningAgent = PlanningAgent(
         llmClient = ollamaClient,
@@ -58,12 +59,14 @@ fun main() {
                 // Code agent: responsible for implementation-oriented work.
                 CodeAgent(
                     llmClient = ollamaClient,
-                    systemPrompt = codePrompt
+                    promptLoader = promptLoader,
+                    promptSelector = promptSelector
                 ),
                 // Review agent: responsible for checking and reviewing generated work.
                 ReviewAgent(
                     llmClient = ollamaClient,
-                    systemPrompt = reviewPrompt
+                    promptLoader = promptLoader,
+                    promptSelector = promptSelector
                 )
             )
         ),

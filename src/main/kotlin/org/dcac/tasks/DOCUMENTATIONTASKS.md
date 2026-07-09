@@ -92,17 +92,22 @@ Current routing responsibilities:
 - receive planned agent identifiers
 - find matching registered agents
 - preserve planned execution order
+- log unknown planned agent identifiers
 - return the selected agent list to `AiOrchestrator`
 
 Possible future improvements:
-- report unknown planned agent identifiers
 - fail fast when a required planned agent is missing
+- distinguish required agents from optional future agents
 - support optional agents
 - support fallback agents
 - dynamic agent registration
 - routing based on model availability
 - routing based on workflow state
 - routing based on prompt domain or artifact type
+
+If a planned agent identifier cannot be resolved, `TaskRouter` logs a message and skips that agent.
+`TaskRouter` then maps those identifiers to registered agents by comparing them with `agent.id`.
+This allows future workflow types such as documentation or tests to be planned before their dedicated agents are implemented.
 
 Its purpose is to keep concrete agent resolution independent from the central orchestrator.
 
