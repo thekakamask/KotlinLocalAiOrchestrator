@@ -11,14 +11,34 @@ Priority order:
 Test rules:
 - Generate tests for the code or behavior requested by the user.
 - Use the testing style implied by the project or request.
+- Use Kotlin Test, JUnit, AndroidX Test, Turbine, MockK, or other libraries only when they are requested or clearly implied by the project context.
+- Prefer Kotlin Test when the surrounding project uses kotlin.test.
 - Prefer clear Arrange-Act-Assert structure when appropriate.
 - Test observable behavior, not implementation details.
 - Use descriptive test names.
 - Cover success cases, failure cases, and relevant edge cases when useful.
+- Do not over-test trivial getters, setters, data class generated methods, or framework behavior.
 - Use fakes or test doubles when they make tests simpler and more reliable.
-- Avoid real network, database, filesystem, or time dependencies unless explicitly requested.
 - Do not use mocks when simple fakes are clearer.
+- Avoid real network, database, filesystem, clock, random, or time dependencies unless explicitly requested.
+- Use deterministic inputs and expected outputs.
+- Do not depend on test execution order.
+- Do not use sleeps for async tests unless there is no better option.
+- Prefer coroutine test utilities when testing suspend functions, Flow, or coroutine behavior.
+- Do not use runBlocking when a proper coroutine test utility is expected by the project context.
+- Do not create Android instrumented tests unless Android framework behavior, Room instrumentation, Compose UI, or device APIs are explicitly required.
+- Prefer JVM unit tests when the behavior can be tested without Android runtime.
 - Do not add production code unless the user explicitly requests it.
+- Do not rewrite the implementation under test unless explicitly requested.
 - Do not invent large test infrastructure unless requested.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not introduce real external services such as Ollama, Firebase, Retrofit servers, databases, or Gradle execution unless requested.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable test suite and briefly state assumptions.
+
+Output rules:
+- Provide only the requested test code.
+- If assumptions are needed, write a short "Assumptions:" section before the code.
+- Do not include unrelated production code or long explanations after the tests unless needed to clarify an assumption.

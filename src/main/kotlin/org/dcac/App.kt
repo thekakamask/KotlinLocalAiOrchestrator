@@ -4,6 +4,8 @@ import org.dcac.agents.CodeAgent
 import org.dcac.agents.PlanningAgent
 import org.dcac.agents.ReviewAgent
 import org.dcac.client.OllamaClient
+import org.dcac.config.ApplicationConfigLoader
+import org.dcac.logging.ConsoleOrchestrationLogger
 import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
 import org.dcac.orchestrator.AiOrchestrator
@@ -27,20 +29,25 @@ const val RED = "\u001B[31m"
 fun main() {
 
     // Create the Ollama client used by agents to communicate with the local LLM runtime.
-    val ollamaClient = OllamaClient()
+    val config = ApplicationConfigLoader().load()
+    val logger = ConsoleOrchestrationLogger()
+
+    val ollamaClient = OllamaClient(
+        baseUrl = config.ollamaBaseUrl
+    )
 
     // Create the prompt loader used to read agent system prompts from resources.
     val promptLoader = PromptLoader()
 
     val promptSelector = PromptSelector()
 
-    // Load the system prompts used by each specialized agent.
-    //val managerPrompt = promptLoader.loadPrompt("prompts/planning.txt")
     val planningPrompt = promptLoader.loadPrompt("prompts/planning.txt")
 
     val planningAgent = PlanningAgent(
         llmClient = ollamaClient,
-        systemPrompt = planningPrompt
+        systemPrompt = planningPrompt,
+        model = config.planningModel,
+        logger = logger
     )
 
     val workflowPlanner = WorkflowPlanner()
@@ -51,30 +58,32 @@ fun main() {
         router = TaskRouter(
             // Register the agents currently available in the local orchestration pipeline.
             agents = listOf(
-                // Manager agent: responsible for high-level planning and coordination.
-                /*ManagerAgent(
-                    llmClient = ollamaClient,
-                    systemPrompt = managerPrompt
-                ),*/
                 // Code agent: responsible for implementation-oriented work.
                 CodeAgent(
                     llmClient = ollamaClient,
                     promptLoader = promptLoader,
-                    promptSelector = promptSelector
+                    promptSelector = promptSelector,
+                    model = config.codeModel,
+                    logger = logger
                 ),
                 // Review agent: responsible for checking and reviewing generated work.
                 ReviewAgent(
                     llmClient = ollamaClient,
                     promptLoader = promptLoader,
-                    promptSelector = promptSelector
+                    promptSelector = promptSelector,
+                    model = config.reviewModel,
+                    logger = logger
                 )
-            )
+            ),
+            logger = logger
         ),
         // Add the validator that checks whether a task is valid before execution starts.
         validator = TaskValidator(),
         responseSynthesizer = ResponseSynthesizer(),
         planningAgent = planningAgent,
-        workflowPlanner = workflowPlanner
+        workflowPlanner = workflowPlanner,
+        promptSelector = promptSelector,
+        logger = logger
     )
 
     // Create a sample task that represents a user request to generate Kotlin code.
@@ -84,9 +93,7 @@ fun main() {
         // Human-readable title describing the task.
         title = "Create domain class",
         // Detailed instruction that will be passed to the selected agents.
-        instruction = "Implement Kotlin code for a simple Order entity.",
-        // Categorize the task as a code-related request.
-        //type = TaskType.CODE
+        instruction = "Implement Kotlin code for a simple Order entity."
     )
 
     // Create the execution context shared with all agents during this run.
@@ -147,7 +154,6 @@ fun main() {
         The code should allow creating an order with multiple items and retrieving the full order details later.
         Keep the design simple, maintainable, and appropriate for a production Android app.
     """.trimIndent(),
-        //type = TaskType.CODE
     )
 
     val result2 = orchestrator.execute(task2, context)

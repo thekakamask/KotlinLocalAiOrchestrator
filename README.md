@@ -41,29 +41,27 @@ The entire ecosystem is designed to run locally and offline.
 
 ## ✅ **LAST MAJOR UPDATES (see [UPDATES.md](./UPDATES.md) for details)**
 
-   - Added domain-specific prompt selection with `PromptDomain` and `PromptSelector`
-   - Added specialized code and review prompt families under `src/main/resources/prompts/code` and `src/main/resources/prompts/review`
-   - Added specialized prompts for general code, models, Room, Firebase, Retrofit, DataStore, synchronization, dependency injection, ViewModel, Compose UI, tests, documentation, and utilities
-   - Updated `CodeAgent` and `ReviewAgent` to dynamically load the correct prompt at runtime for each task
-   - Added runtime logs showing selected prompt domain and prompt path
-   - Added planning fallback behavior when the planning model fails or returns invalid workflow data
-   - Updated `TaskRouter` to report missing planned agents instead of silently ignoring them
-   - Realigned the JVM test suite with the planning and prompt-selection architecture
-   - Added tests for prompt selection, planning fallback, workflow planning, planned routing, agent prompt loading, and orchestrator execution
-   - Confirmed the full JVM test suite passes successfully
+   - Hardened planning, code, and review prompts with stronger guardrails against scope expansion, invalid review advice, and unnecessary architecture
+   - Centralized prompt domain detection in `AiOrchestrator` and stored the selected domain in `ExecutionContext`
+   - Added runtime configuration loading with `ApplicationConfig` and `ApplicationConfigLoader`
+   - Loaded Ollama base URL and planning/code/review model names from `application.properties`
+   - Updated `OllamaClient` to use a configurable base URL
+   - Injected configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`
+   - Added centralized orchestration logging with `OrchestrationLogger` and `ConsoleOrchestrationLogger`
+   - Removed legacy `ManagerAgent`, `TaskType`, and `TaskClassifier`
+   - Updated tests to use explicit model injection, centralized prompt domain context, and fake orchestration logging
 
 
 ## ❌ **NEXT UPDATES**
 
-   - Improve specialized review prompt output-format enforcement
-   - Centralize prompt domain detection in workflow metadata or execution context
    - Add a deterministic fast-path planner for obvious workflow decisions
    - Reduce planning latency for simple requests
+   - Validate specialized prompts across more real-world requests
+   - Improve Room prompt accuracy for complex entity relationships
    - Add a future `TestAgent`
    - Add a future `DocumentationAgent`
    - Improve final response formatting and reduce duplicated agent content
    - Add real file generation workflow
-   - Load model configuration cleanly from `application.properties`
    - Improve client timeout handling and retry strategies
    - Check model availability before generation
    - Add ComfyUI client
@@ -82,6 +80,7 @@ The entire ecosystem is designed to run locally and offline.
       - 🟩 **IN PROGRESS** Result aggregation
       - 🟩 **IN PROGRESS** Final response synthesis
       - 🟩 **IN PROGRESS** Failure handling and error reporting
+      - 🟩 **IN PROGRESS** Centralized orchestration logging
 
    - 🧩 **Specialized agent responsibilities**
       - 🟩 **IN PROGRESS** Planning agent workflow selection
@@ -114,6 +113,7 @@ The entire ecosystem is designed to run locally and offline.
       - 🟩 **IN PROGRESS** Privacy-first architecture
       - 🟩 **IN PROGRESS** Local model interoperability
       - 🟩 **IN PROGRESS** Local GPU-accelerated inference
+      - 🟩 **IN PROGRESS** Configurable local Ollama endpoint and model selection
 
    - 🧪 **Testing and reliability**
       - 🟩 **IN PROGRESS** Unit test foundation
@@ -136,7 +136,6 @@ The entire ecosystem is designed to run locally and offline.
    - **Qwen 3 8B** : Current planning model candidate
    - **Qwen 2.5 Coder 14B** : Current code generation model candidate
    - **DeepSeek Coder V2 16B** : Current review model candidate for deeper review workflows
-   - **Mistral 7B** : Previously used manager model, now legacy / optional
    - **ComfyUI** : Planned media generation workflow engine
    - **Juggernaut XL (SDXL)** : Planned image generation model
    - **Stable Video Diffusion XT** : Planned video generation model
@@ -159,6 +158,8 @@ The entire ecosystem is designed to run locally and offline.
    - **org.dcac.synthesis** - final response synthesis components used to build user-facing orchestration output
    - **org.dcac.prompts** - prompt loading and prompt selection utilities used to choose domain-specific agent prompts
    - **org.dcac.utils** - runtime utilities such as duration formatting and progress timers
+   - **org.dcac.config** - application configuration loading for Ollama base URL and model names
+   - **org.dcac.logging** - centralized orchestration logging abstraction and console logger
    - **src/main/resources** - application configuration and externalized planning, code, and review prompt templates
    - **src/test/kotlin** - JVM unit tests and fake test utilities for validators, agents, prompt selection, workflow planning, routing, synthesis, and orchestrator behavior
    - **ARCHITECTURE.md** - detailed documentation of the current Kotlin orchestration structure
@@ -169,6 +170,8 @@ The entire ecosystem is designed to run locally and offline.
    - A user request is represented as an `OrchestrationTask`
    - The task is executed with an `ExecutionContext`
    - Agent system prompts are loaded from `src/main/resources/prompts`
+   - `ApplicationConfigLoader` loads Ollama base URL and model names from `application.properties`
+   - `App.kt` injects configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`
    - `AiOrchestrator` validates the task with `TaskValidator`
    - If validation fails, `AiOrchestrator` returns an unsuccessful `OrchestrationResult` with validation errors and no agent execution
    - `PlanningAgent` sends the user instruction to the local planning model through `OllamaClient`
@@ -177,7 +180,9 @@ The entire ecosystem is designed to run locally and offline.
    - `TaskRouter` selects the concrete agent instances from the planned agent identifiers
    - `AiOrchestrator` logs the selected workflow, complexity, planning reason, selected agents, and execution timings
    - Selected agents are executed sequentially
-   - `CodeAgent` and `ReviewAgent` detect the prompt domain from the current task instruction
+   - `AiOrchestrator` detects the prompt domain once with `PromptSelector`
+   - The selected prompt domain is stored in `ExecutionContext`
+   - `CodeAgent` and `ReviewAgent` use the prompt domain from `ExecutionContext`
    - `PromptSelector` resolves the correct domain-specific prompt path
    - `PromptLoader` loads the selected prompt for the current agent execution
    - `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`
@@ -202,14 +207,12 @@ The project currently contains a working local planning-based orchestration pipe
 
    - Planning is currently performed by a local LLM and can be slow for simple requests
    - A deterministic fast-path planner for obvious workflows is not implemented yet
-   - Prompt domain detection is currently keyword-based
-   - `CodeAgent` and `ReviewAgent` currently detect prompt domain independently
-   - Some specialized review prompts still need stronger output-format enforcement
+   - Prompt domain detection is centralized in the orchestration context, but it is still keyword-based
    - Test and documentation workflow types exist as planning targets, but dedicated agents are not implemented yet
    - Final response synthesis is implemented, but it is deterministic and may duplicate detailed agent content
    - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
    - Generated code is displayed in the console but not written to files yet
-   - Error handling exists, but retry and fallback strategies are not implemented yet
+   - Planning fallback exists, but client retries and advanced recovery strategies are not implemented yet
    - Client request timeouts are not configured yet
    - Model availability is not checked before generation
    - ComfyUI integration is not implemented in Kotlin yet

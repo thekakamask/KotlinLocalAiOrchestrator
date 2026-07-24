@@ -4,11 +4,13 @@ package org.dcac.orchestrator
 // Import the runtime context passed to agents during execution.
 import org.dcac.agents.AgentResult
 import org.dcac.agents.PlanningAgent
+import org.dcac.logging.OrchestrationLogger
 import org.dcac.models.ExecutionContext
 // Import the final result type returned by the orchestrator.
 import org.dcac.models.OrchestrationResult
 // Import the task type handled by the orchestrator.
 import org.dcac.models.OrchestrationTask
+import org.dcac.prompts.PromptSelector
 import org.dcac.synthesis.ResponseSynthesizer
 // Import the component responsible for selecting agents for a task.
 import org.dcac.tasks.TaskRouter
@@ -37,18 +39,20 @@ class AiOrchestrator(
     private val planningAgent: PlanningAgent,
 
     // Workflow planner used to resolve the workflow into an ordered agent pipeline.
-    private val workflowPlanner: WorkflowPlanner
+    private val workflowPlanner: WorkflowPlanner,
+    private val promptSelector: PromptSelector,
+    private val logger: OrchestrationLogger
 ) {
     // Execute one orchestration task with the provided runtime context.
     fun execute(task: OrchestrationTask, context: ExecutionContext): OrchestrationResult {
         val orchestrationStartTime = System.currentTimeMillis()
-        println("Starting orchestration for task: ${task.id}")
-        println("Validating task...")
+        logger.orchestrationStarted(task.id)
+        logger.taskValidationStarted()
         // Validate the task before routing it to agents.
         val errors = validator.validate(task)
         // Stop execution if validation produced at least one error.
         if (errors.isNotEmpty()) {
-            println("Task validation failed.")
+            logger.taskValidationFailed()
             // Return a failed orchestration result without running any agent.
             return OrchestrationResult(
                 // Keep the original task id so the failure can be traced.
@@ -64,8 +68,8 @@ class AiOrchestrator(
             )
         }
 
-        println("Task validation succeeded.")
-        println("Planning workflow...")
+        logger.taskValidationSucceeded()
+        logger.planningStarted()
 
         // Store the start time of the planning step.
         val planningStartTime = System.currentTimeMillis()
@@ -90,37 +94,43 @@ class AiOrchestrator(
         // Calculate the total planning duration.
         val planningDurationMs = System.currentTimeMillis() - planningStartTime
 
-        println()
-        println("Planning completed | duration=${TimeUtils.formatDuration(planningDurationMs)}")
+        logger.planningCompleted(TimeUtils.formatDuration(planningDurationMs))
 
         // Complete the plan by resolving the selected workflow into agent identifiers.
         val workflowPlan = workflowPlanner.complete(initialPlan)
 
         // Display the selected workflow for debugging and observability.
-        println("Selected workflow: ${workflowPlan.workflowType}")
-
         // Display the estimated workflow complexity.
-        println("Workflow complexity: ${workflowPlan.complexity}")
-
         // Display the short explanation returned by the planning agent.
-        println("Workflow reason: ${workflowPlan.reason}")
-        println("Routing planned agents...")
+        logger.workflowSelected(
+            workflowPlan.workflowType,
+            workflowPlan.complexity,
+            workflowPlan.reason
+        )
+
+        val promptDomain = promptSelector.detectDomain(task.instruction)
+
+        logger.promptDomainSelected(promptDomain)
+        logger.routingStarted()
 
         // Select the concrete agent instances from the planned agent identifiers.
         val selectedAgents = router.route(workflowPlan.agentIds)
 
         // Display the final ordered agent pipeline.
-        println("Selected agents: ${selectedAgents.joinToString { it.id }}")
+        logger.agentsSelected(
+            selectedAgents.map { agent -> agent.id }
+        )
 
         // Keep all agent results produced during the workflow.
         val results = mutableListOf<AgentResult>()
 
-        // Keep a mutable version of the execution context so each agent can enrich it.
-        var currentContext = context
+        var currentContext = context.copy(
+            promptDomain = promptDomain
+        )
 
         // Execute selected agents sequentially
         for (agent in selectedAgents) {
-            println("Running agent: ${agent.id}...")
+            logger.agentStarted(agent.id)
 
             val agentStartTime = System.currentTimeMillis()
             val isAgentRunning = AtomicBoolean(true)
@@ -138,9 +148,10 @@ class AiOrchestrator(
 
             val agentDurationMs = System.currentTimeMillis() - agentStartTime
 
-            println()
-            println(
-                "Agent completed: ${agent.id} | success=${result.success} | duration=${TimeUtils.formatDuration(agentDurationMs)}"
+            logger.agentCompleted(
+                agentId = agent.id,
+                success = result.success,
+                duration = TimeUtils.formatDuration(agentDurationMs)
             )
 
             results.add(result)
@@ -150,13 +161,15 @@ class AiOrchestrator(
             )
         }
 
-        println("Building final response...")
+        logger.finalResponseStarted()
 
         // Build the final user-facing response from all agent results.
         val finalResponse = responseSynthesizer.synthesize(task, results)
 
         val orchestrationDurationMs = System.currentTimeMillis() - orchestrationStartTime
-        println("Orchestration completed in ${TimeUtils.formatDuration(orchestrationDurationMs)}.")
+        logger.orchestrationCompleted(
+            TimeUtils.formatDuration(orchestrationDurationMs)
+        )
 
         // Return the final orchestration result after all selected agents have run.
         return OrchestrationResult(

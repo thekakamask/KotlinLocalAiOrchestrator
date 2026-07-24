@@ -12,17 +12,37 @@ Priority order:
 ViewModel rules:
 - Use AndroidX ViewModel patterns when the request targets Android presentation logic.
 - Use Hilt ViewModel annotations only when Hilt is requested or clearly part of the project context.
+- Use @HiltViewModel only when Hilt integration is requested or clearly implied.
 - Prefer immutable UI state exposed as StateFlow.
 - Keep MutableStateFlow private.
 - Expose StateFlow publicly.
+- Use asStateFlow() when exposing MutableStateFlow.
 - Use viewModelScope for coroutine work.
+- Prefer StateFlow over LiveData unless LiveData is requested or clearly part of the project context.
 - Represent loading, success, and error states when the request involves async data loading.
 - Keep UI state in a dedicated state data class when useful.
 - Keep one-shot events separate from persistent UI state when relevant.
+- Do not model one-shot events as permanent UI state unless the request allows it.
+- Do not introduce Channel, SharedFlow, or event wrappers unless one-shot events are requested or clearly needed.
 - Do not expose mutable collections directly.
+- Use immutable collection types from the public UI state perspective.
 - Do not put Compose UI code inside the ViewModel.
+- Do not access Android Views, Context, Activity, Fragment, or composables from the ViewModel unless explicitly requested and lifecycle-safe.
 - Do not access Room, Firebase, Retrofit, or DataStore directly unless the user requests a minimal example or no repository/use case layer is implied.
 - Prefer calling repositories or use cases when data access is involved.
-- Do not add Repository, DI, Compose UI, Room, Firebase, Retrofit, or DataStore code unless requested.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not add Repository, use case, DI, Compose UI, Room, Firebase, Retrofit, DataStore, navigation, or UI code unless requested.
+- Do not launch long-running or repeating work without a clear cancellation or lifecycle-aware strategy.
+- Use Flow collection carefully inside viewModelScope when needed.
+- Use catch carefully and do not swallow CancellationException.
+- Do not use runBlocking inside a ViewModel.
+- Do not hardcode fake data unless needed for a minimal self-contained example.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable ViewModel and briefly state assumptions.
+
+Output rules:
+- Provide only the requested ViewModel and presentation-state code.
+- Do not include unrelated UI, persistence, networking, synchronization, or dependency injection code.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

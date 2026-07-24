@@ -13,16 +13,15 @@ Each specialized agent has:
 - access to the shared `LlmClient` when it calls a text model
 - access to the shared `ExecutionContext`
 - a standardized `AgentResult` output with success or failure metadata
+- an injected model name when it calls a local LLM
+- access to centralized orchestration logging through `OrchestrationLogger`
 
 The current active text-based agents are:
 - `PlanningAgent`
 - `CodeAgent`
 - `ReviewAgent`
 
-Legacy / transitional agent:
-- `ManagerAgent`
-
-The current workflow is no longer a fixed manager → code → review chain.
+The current workflow is a planning-based code and review pipeline.
 
 Instead:
 - `PlanningAgent` analyzes the user request and selects a workflow type, complexity level, and reason
@@ -111,7 +110,7 @@ Its purpose is to keep planning output structured, predictable, and easy to proc
 
 Current configuration:
 - role → workflow planning agent
-- local model → Qwen 3 8B candidate
+- local model → configured through `application.properties`, currently Qwen 3 8B candidate
 - backend → `LlmClient`
 - system prompt → loaded from `src/main/resources/prompts/planning.txt`
 
@@ -139,40 +138,12 @@ Current capabilities:
 - planning reason generation
 - structured planning response parsing
 - fallback workflow selection when planning fails
+- planning fallback logging through `OrchestrationLogger`
 
 Current limitations:
 - planning is still performed by a local LLM and can be slow for simple requests
 - obvious workflow decisions may later be handled by deterministic Kotlin code
 - invalid or malformed planning JSON is handled with a fallback workflow
-
-
-### `ManagerAgent`
-
-`ManagerAgent` is a legacy planning and coordination agent.
-
-Previous configuration:
-- agent identifier → `manager`
-- role → planning and coordination agent
-- local model → Mistral 7B
-- backend → `LlmClient`
-- system prompt → previously loaded from `src/main/resources/prompts/manager.txt`
-
-Previous role:
-- produce an execution plan
-- guide `CodeAgent`
-- provide context for `ReviewAgent`
-
-Current status:
-- no longer part of the default active workflow
-- replaced by `PlanningAgent` and deterministic `WorkflowPlanner` for workflow selection
-- may be reused later for complex architecture planning or multi-step task decomposition
-
-Possible future responsibilities:
-- complex task decomposition
-- architecture-level planning
-- subtask creation
-- strategic planning for large workflows
-- structured planning output for complex requests
 
 
 ### `CodeAgent`
@@ -182,12 +153,13 @@ Possible future responsibilities:
 Current configuration:
 - agent identifier → `code`
 - role → implementation agent
-- local model → Qwen 2.5 Coder 14B candidate
+- local model → configured through `application.properties`, currently Qwen 2.5 Coder 14B candidate
 - backend → `LlmClient`
 - prompt loading → `PromptLoader`
 - prompt selection → `PromptSelector`
+- logger → `OrchestrationLogger`
 
-Before generation, `CodeAgent` detects the technical domain of the user instruction and loads the matching code prompt.
+Before generation, `CodeAgent` reads the prompt domain from `ExecutionContext` and loads the matching code prompt.
 
 Examples:
 - model/entity request → `prompts/code/model.txt`
@@ -217,7 +189,7 @@ Its output is stored by `AiOrchestrator` in:
 
 Current capabilities:
 - real local code generation
-- dynamic domain-specific prompt selection
+- domain-specific prompt loading from centralized prompt domain context
 - language-aware implementation
 - context-aware implementation
 - assumption explanation
@@ -229,7 +201,6 @@ Possible future responsibilities:
 - generate tests
 - refactor existing code
 - return structured generated artifacts
-- use workflow metadata instead of detecting prompt domain independently
 
 
 ### `ReviewAgent`
@@ -239,12 +210,13 @@ Possible future responsibilities:
 Current configuration:
 - agent identifier → `review`
 - role → code review agent
-- local model → DeepSeek Coder V2 16B candidate
+- local model → configured through `application.properties`, currently DeepSeek Coder V2 16B candidate
 - backend → `LlmClient`
 - prompt loading → `PromptLoader`
 - prompt selection → `PromptSelector`
+- logger → `OrchestrationLogger`
 
-Before review, `ReviewAgent` detects the technical domain of the user instruction and loads the matching review prompt.
+Before review, `ReviewAgent` reads the prompt domain from `ExecutionContext` and loads the matching review prompt.
 
 Examples:
 - model/entity request → `prompts/review/model.txt`
@@ -272,7 +244,7 @@ If the LLM client fails, `ReviewAgent` catches the exception and returns a faile
 
 Current capabilities:
 - real local code review
-- dynamic domain-specific prompt selection
+- domain-specific prompt loading from centralized prompt domain context
 - review of the actual `CodeAgent` output
 - consistency check against the original instruction
 - domain-specific review guidance
@@ -284,7 +256,6 @@ Possible future responsibilities:
 - validate architecture decisions
 - approve or reject generated artifacts
 - trigger a correction loop with `CodeAgent`
-- use workflow metadata instead of detecting prompt domain independently
 
 
 ## ⚙️ Current Agent Workflow
@@ -297,16 +268,19 @@ Current high-level flow:
 3. `PlanningAgent` returns a workflow type, complexity level, and reason.
 4. `WorkflowPlanner` converts the selected workflow into ordered agent identifiers.
 5. `TaskRouter` resolves the planned identifiers into concrete agent instances.
-6. `CodeAgent` and `ReviewAgent` detect the prompt domain for the current task when they run.
-8. `PromptSelector` resolves the matching code or review prompt path.
-9. `PromptLoader` loads the selected prompt for the current agent.
-10. `CodeAgent` generates implementation output when selected.
-11. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
-12. `ReviewAgent` reviews the generated code when selected.
-13. Each executable agent returns an enriched `AgentResult`.
-14. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
-15. The results are aggregated into an `OrchestrationResult`.
-16. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
+6. `App.kt` injects configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`.
+7. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
+8. The selected prompt domain is stored in `ExecutionContext`.
+9. `CodeAgent` and `ReviewAgent` read the prompt domain from `ExecutionContext`.
+10. `PromptSelector` resolves the matching code or review prompt path.
+11. `PromptLoader` loads the selected prompt for the current agent.
+12. `CodeAgent` generates implementation output when selected.
+13. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
+14. `ReviewAgent` reviews the generated code when selected.
+15. Each executable agent returns an enriched `AgentResult`.
+16. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
+17. The results are aggregated into an `OrchestrationResult`.
+18. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
 
 Example workflow mappings:
 - `CODE_ONLY` → `CodeAgent`
@@ -352,5 +326,4 @@ Current prompt specialization includes code and review prompt variants for multi
 Future improvements may include:
 - documentation-agent prompt families
 - test-agent prompt families
-- centralized prompt domain selection in workflow metadata
 - stronger structured review output enforcement

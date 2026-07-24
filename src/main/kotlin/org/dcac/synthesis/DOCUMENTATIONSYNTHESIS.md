@@ -62,7 +62,7 @@ Current tested scenarios:
 - builds a successful final response when all executable agents succeed
 - includes implementation output when a `code` result exists
 - includes review output when a `review` result exists
-- does not expose legacy manager planning output in the final response
+- does not expose planning-only metadata as executable agent output
 - builds a failure-oriented final response when one or more agents fail
 - displays `Unknown error` when a failed agent has no error message
 

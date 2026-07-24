@@ -19,7 +19,9 @@ Current prompt files are stored under:
 
 The previous `manager.txt` prompt has been replaced in the active workflow by `planning.txt`.
 The active workflow now uses a planning prompt to select the workflow type, complexity, and reason before executable agents run.
-`CodeAgent` and `ReviewAgent` then use `PromptSelector` to select the most appropriate domain-specific prompt for the current task.
+`AiOrchestrator` detects the prompt domain once with `PromptSelector` and stores it in `ExecutionContext`.
+`CodeAgent` and `ReviewAgent` then use that shared prompt domain to load the appropriate domain-specific prompt.
+
 
 ## `PromptLoader`
 
@@ -33,9 +35,12 @@ Current responsibility:
 Current usage:
 1. `App.kt` creates a `PromptLoader`.
 2. `PromptLoader` loads `prompts/planning.txt` for `PlanningAgent`.
-3. `CodeAgent` receives `PromptLoader` and loads its selected code prompt at runtime.
-4. `ReviewAgent` receives `PromptLoader` and loads its selected review prompt at runtime.
-5. Agents send these prompts to their assigned Ollama model through `LlmClient`.
+3. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
+4. The selected prompt domain is stored in `ExecutionContext`.
+5. `CodeAgent` receives `PromptLoader` and loads the code prompt matching `ExecutionContext.promptDomain`.
+6. `ReviewAgent` receives `PromptLoader` and loads the review prompt matching `ExecutionContext.promptDomain`.
+7. Agents send these prompts to their assigned Ollama model through `LlmClient`.
+
 
 ## `PromptDomain`
 
@@ -60,12 +65,12 @@ Its purpose is to separate technical prompt specialization from workflow selecti
 
 ## `PromptSelector`
 
-`PromptSelector` detects the technical domain of the user instruction and returns the matching prompt resource path.
+`PromptSelector` detects the technical domain of the user instruction and resolves matching prompt resource paths.
 
 Current responsibilities:
 - detect the prompt domain from the task instruction
-- return the code prompt path for a detected domain
-- return the review prompt path for a detected domain
+- return the code prompt path for a selected domain
+- return the review prompt path for a selected domain
 
 Example mappings:
 - `MODEL` → `prompts/code/model.txt`
@@ -123,12 +128,12 @@ Current review prompts:
 - Room, ViewModel, Compose UI, Retrofit, Firebase, DataStore, synchronization, dependency injection, test, documentation, model, and utility workflows can receive more targeted prompt guidance.
 - Different tasks in the same runtime can use different prompts.
 - The test suite now covers prompt-domain detection and prompt-path selection.
+- Prompt domain detection is now performed once per orchestration workflow.
+- `CodeAgent` and `ReviewAgent` use the same selected prompt domain through `ExecutionContext`.
 
 ## Current Limitations
 
-- Prompt domain detection is currently keyword-based.
-- `CodeAgent` and `ReviewAgent` currently detect the prompt domain independently.
-- Prompt domain selection is not yet centralized in workflow metadata or execution context.
+- Prompt domain detection is centralized in `AiOrchestrator`, but it is still keyword-based.
 - Prompt loading is fail-fast and does not provide fallback prompts.
 - Prompt templates do not yet support variables or placeholders.
 - Prompt versioning is not implemented.
@@ -138,7 +143,6 @@ Current review prompts:
 
 ## Future Improvements
 
-- centralize prompt domain detection in workflow metadata or execution context
 - load prompt paths from configuration
 - add fallback prompts
 - support prompt variables and template rendering

@@ -19,6 +19,7 @@ Current properties:
 - `projectPath` → identifies the project or workspace used during execution
 - `userLocale` → defines the user's locale, with `fr-FR` as the current default
 - `agentOutputs` → stores outputs produced by previous agents during the same workflow
+- `promptDomain` → stores the prompt domain selected once by `AiOrchestrator` for the current workflow
 
 `ExecutionContext` is passed to every selected executable agent through the `run()` function.
 It is actively used to share data between agents during chained orchestration.
@@ -26,6 +27,8 @@ It is actively used to share data between agents during chained orchestration.
 Current workflow usage:
 - `AiOrchestrator` stores the code output in `agentOutputs["code"]`
 - `ReviewAgent` reads `agentOutputs["code"]` to review the generated code
+- `AiOrchestrator` stores the selected prompt domain in `ExecutionContext.promptDomain`
+- `CodeAgent` and `ReviewAgent` read `promptDomain` to load domain-specific prompts
 - Future agents can read previous outputs to continue the workflow
 
 Possible future responsibilities:
@@ -74,29 +77,6 @@ Possible future properties:
 Its purpose is to standardize how work units move through the system.
 
 
-### `TaskType`
-
-`TaskType` defines the previous task category taxonomy used by the earlier routing workflow.
-
-Current values:
-- `CODE`
-- `REVIEW`
-- `TEST`
-- `DOCUMENTATION`
-- `IMAGE`
-- `VIDEO`
-- `GENERAL`
-
-Current status:
-- transitional
-- no longer the main active workflow decision mechanism
-- may still exist in the codebase during refactoring
-- may still be used by legacy tests or older components
-
-The active workflow now relies on `PlanningAgent`, `WorkflowType`, `TaskComplexity`, and `WorkflowPlan` instead of manually assigning a `TaskType`.
-Its future role is undecided. It may be removed, kept for UI hints, or reused as a secondary classification signal.
-
-
 ### `WorkflowType`
 
 `WorkflowType` defines the execution strategy selected by the planning step.
@@ -132,7 +112,7 @@ It may later influence model selection, test generation, documentation generatio
 Prompt selection is currently handled separately through `PromptDomain` and `PromptSelector`.
 
 
-### `PromptDomain`
+### 🔗 Related Model: `PromptDomain`
 
 `PromptDomain` defines the technical domain used to select specialized prompts for executable agents.
 
@@ -170,11 +150,13 @@ Current workflow usage:
 - `WorkflowPlanner` completes the plan by filling `agentIds`
 - `TaskRouter` uses `agentIds` to select concrete agent instances
 - `AiOrchestrator` executes selected agents in the planned order
+- `AiOrchestrator` stores the selected prompt domain in `ExecutionContext.promptDomain`
+- `CodeAgent` and `ReviewAgent` read `promptDomain` to load domain-specific prompts
 
 Its purpose is to make workflow selection explicit, inspectable, and deterministic after the planning decision.
 `WorkflowPlan` does not currently store prompt domain information.
-Prompt domain detection is currently performed by `CodeAgent` and `ReviewAgent` during execution.
-This may later be centralized in workflow metadata or execution context.
+Prompt domain detection is currently performed once by `AiOrchestrator` and stored in `ExecutionContext`.
+This keeps workflow selection and prompt specialization separate.
 
 
 ### `OrchestrationResult`

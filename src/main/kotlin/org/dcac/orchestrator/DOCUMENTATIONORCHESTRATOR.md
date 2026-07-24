@@ -11,7 +11,8 @@ This package connects:
 - workflow planning
 - deterministic workflow completion
 - planned agent routing
-- domain-specific prompt selection through executable agents
+- centralized prompt domain detection
+- domain-specific prompt selection through execution context
 - sequential agent execution
 - shared workflow context updates
 - agent failure aggregation
@@ -33,12 +34,14 @@ The package currently contains the `AiOrchestrator` class.
 `AiOrchestrator` is the main execution service of the application.
 Its role is to coordinate every step required to process an `OrchestrationTask`.
 
-The class receives five dependencies:
+The class receives seven dependencies:
 - `TaskRouter` → resolves planned agent identifiers into concrete agent instances
 - `TaskValidator` → verifies that the task is valid
 - `ResponseSynthesizer` → builds the final user-facing response from agent results
 - `PlanningAgent` → selects the workflow type, complexity, and reason from the user instruction
 - `WorkflowPlanner` → completes the workflow plan by resolving it into ordered agent identifiers
+- `PromptSelector` → detects the prompt domain once for the current workflow
+- `OrchestrationLogger` → centralizes runtime orchestration logs
 
 Its main function is `execute()`.
 
@@ -73,6 +76,9 @@ Current responsibilities:
 - store the synthesized response in `OrchestrationResult.finalResponse`
 - build and return the final `OrchestrationResult`
 - display progress timers and execution durations for planning and agent execution
+- detect the prompt domain once with `PromptSelector`
+- store the selected prompt domain in `ExecutionContext`
+- log orchestration events through `OrchestrationLogger`
 
 Its purpose is to keep coordination logic separate from validation, planning, agent behavior, workflow selection, and external API communication.
 
@@ -89,17 +95,20 @@ The current orchestration workflow follows these steps:
 7. `PlanningAgent` analyzes the user instruction and returns a workflow type, complexity level, and reason.
 8. `WorkflowPlanner` completes the plan by mapping the workflow type to ordered agent identifiers.
 9. `TaskRouter` resolves those identifiers into concrete registered agents.
-10. `AiOrchestrator` executes the selected agents sequentially in planned order.
-11. `CodeAgent` and `ReviewAgent` detect the prompt domain for the current task when they run.
-12. `PromptSelector` resolves the matching domain-specific prompt path.
-13. `PromptLoader` loads the selected prompt for the current agent.
-13. After each executable agent completes, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
-14. Downstream agents can read previous outputs from the shared context.
-15. Each executable agent returns an enriched `AgentResult`.
-16. If an executable agent fails, it returns a failed `AgentResult` with an `errorMessage`.
-17. All agent results are grouped into an `OrchestrationResult`.
-18. `ResponseSynthesizer` builds a final user-facing response from the agent results.
-19. The synthesized response is stored in `OrchestrationResult.finalResponse`.
+10. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
+11. The selected prompt domain is stored in `ExecutionContext`.
+12. `AiOrchestrator` executes the selected agents sequentially in planned order.
+13. `CodeAgent` and `ReviewAgent` read the prompt domain from `ExecutionContext`.
+14. `PromptSelector` resolves the matching domain-specific prompt path.
+15. `PromptLoader` loads the selected prompt for the current agent.
+16. After each executable agent completes, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
+17. After each executable agent completes, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
+18. Downstream agents can read previous outputs from the shared context.
+19. Each executable agent returns an enriched `AgentResult`.
+20. If an executable agent fails, it returns a failed `AgentResult` with an `errorMessage`.
+21. All agent results are grouped into an `OrchestrationResult`.
+22. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+23. The synthesized response is stored in `OrchestrationResult.finalResponse`.
 
 Example workflow mappings:
 - `CODE_ONLY` → `CodeAgent`
@@ -114,9 +123,10 @@ The current active code workflow usually runs:
 The current chained behavior is:
 - `PlanningAgent` receives the original instruction and selects the workflow
 - `WorkflowPlanner` converts the selected workflow into agent identifiers
-- `CodeAgent` receives the original instruction, selects a domain-specific code prompt, and generates code
+- `AiOrchestrator` detects the prompt domain once and stores it in `ExecutionContext`
+- `CodeAgent` receives the original instruction, reads the prompt domain from `ExecutionContext`, loads the matching code prompt, and generates code
 - `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`
-- `ReviewAgent`, when selected, receives the original instruction and generated code through the execution context, selects a domain-specific review prompt, and reviews the generated code
+- `ReviewAgent`, when selected, receives the original instruction and generated code through the execution context, reads the prompt domain from `ExecutionContext`, loads the matching review prompt, and reviews the generated code
 
 
 ## ✅ Validation Failure
@@ -181,7 +191,7 @@ Current limitations:
 - planning is currently performed by a local LLM and can be slow for simple requests
 - a deterministic fast-path planner for obvious workflows is not implemented yet
 - test and documentation workflow types exist, but dedicated agents are not implemented yet
-- prompt domain detection is currently keyword-based and performed inside executable agents
+- prompt domain detection is centralized in `AiOrchestrator`, but it is still keyword-based
 - executable agent exceptions are converted into failed `AgentResult` entries, and planning failures fall back to a default workflow, but client-level retry strategies are not implemented
 - final response synthesis is implemented, but it is currently deterministic and may duplicate detailed agent content
 - workflow state is not persisted
@@ -193,12 +203,10 @@ Current limitations:
 
 Possible future improvements:
 - add a deterministic fast-path planner for obvious workflow decisions
-- centralize prompt domain detection in workflow metadata or execution context
 - improve specialized review prompt output-format enforcement
 - decompose complex requests into subtasks
 - add a dedicated `TestAgent`
 - add a dedicated `DocumentationAgent`
-- add real manager-agent supervision only for complex architecture planning
 - improve final response formatting and reduce duplicated agent content
 - execute independent agents in parallel
 - use Kotlin coroutines

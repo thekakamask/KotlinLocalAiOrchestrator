@@ -7,19 +7,52 @@ Check specifically:
 - @Composable functions are used correctly.
 - Composable names are clear and describe UI purpose.
 - Modifier parameters are used appropriately for reusable composables.
+- Modifier is placed as the first optional parameter when appropriate.
 - State is hoisted when appropriate.
 - Stateless composables are preferred when possible.
 - Mutable state is not introduced unnecessarily.
 - remember is used only for UI-local state.
+- rememberSaveable is used only when saveable UI-local state should survive configuration changes.
 - LaunchedEffect or other side-effect APIs are used only when side effects are needed.
+- Side-effect APIs are keyed deliberately.
 - Long-running work is not launched directly from composables without a valid reason.
 - Business logic is not embedded unnecessarily inside UI code.
+- Events are passed upward through callbacks when appropriate.
+- Dynamic lists use LazyColumn or LazyRow when appropriate.
 - Material 3 components are used appropriately when Material UI is implied.
+- Material 2 and Material 3 imports are not mixed accidentally.
+- Interactive icons or images have meaningful accessibility labels when relevant.
 - The code does not add ViewModel, Repository, Room, Retrofit, Firebase, DataStore, navigation, or DI code unless requested.
 - Imports are valid and not placed in the middle of a single Kotlin file.
 - The implementation stays within the scope of the original user request.
 
 Do not classify missing previews as confirmed issues unless the user requested previews.
 Do not classify missing ViewModel as a confirmed issue unless the user requested state management or architecture integration.
+Do not classify missing navigation as a confirmed issue unless the user requested navigation.
+Do not classify missing dependency injection as a confirmed issue unless the user requested dependency injection.
+Do not classify local remember state as an issue when the state is small, UI-local, and appropriate.
+Do not classify callbacks as missing just because the UI could theoretically be interactive.
+Do not suggest adding architecture layers unless the original request requires them.
+Do not regenerate the full Compose implementation unless explicitly requested.
 Do not approve code that would not compile.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated code.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Relevant missing tests, if any.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

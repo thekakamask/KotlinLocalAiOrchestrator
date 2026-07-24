@@ -2,6 +2,7 @@ package org.dcac.agents
 
 import kotlinx.serialization.json.Json
 import org.dcac.client.LlmClient
+import org.dcac.logging.OrchestrationLogger
 import org.dcac.models.OrchestrationTask
 import org.dcac.models.TaskComplexity
 import org.dcac.models.WorkflowPlan
@@ -16,9 +17,10 @@ class PlanningAgent(
 
     // System prompt defining the planning agent behavior.
     private val systemPrompt: String,
+    private val logger: OrchestrationLogger,
 
     // Local model used by the planning agent.
-    private val model: String = "qwen3:8b",
+    private val model: String,
 
     // JSON parser used to decode the planning response.
     private val json: Json = Json {
@@ -47,13 +49,15 @@ class PlanningAgent(
                }
            )
        } catch (exception : Exception) {
-           println("Planning failed, using fallback workflow: ${exception.message ?: "unknown planning error"}")
+
+           val fallbackReason = exception.message ?: "unknown planning error"
+           logger.planningFallback(fallbackReason)
 
            WorkflowPlan(
                workflowType = WorkflowType.CODE_REVIEW,
                complexity = TaskComplexity.MODERATE,
                agentIds = emptyList(),
-               reason = "Fallback workflow selected because planning failed: ${exception.message ?: "unknown planning error"}"
+               reason = "Fallback workflow selected because planning failed: $fallbackReason"
            )
        }
     }

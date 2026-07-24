@@ -45,7 +45,7 @@ class OllamaClient(
 
             // Build the HTTP request sent to Ollama's generation endpoint.
             val httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create("$baseUrl/api/generate"))
+                .uri(URI.create("${baseUrl.trimEnd('/')}/api/generate"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build()

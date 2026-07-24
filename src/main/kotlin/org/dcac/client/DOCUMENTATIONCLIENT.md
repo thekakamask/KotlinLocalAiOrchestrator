@@ -39,9 +39,9 @@ Current agents depend on `LlmClient` instead of depending directly on `OllamaCli
 This allows the same agent implementation to work with another client implementation in the future.
 
 Current usage:
-- `PlanningAgent` calls `LlmClient` with the current planning model candidate
-- `CodeAgent` calls `LlmClient` with the current code generation model candidate
-- `ReviewAgent` calls `LlmClient` with the current review model candidate
+- `PlanningAgent` calls `LlmClient` with the configured planning model
+- `CodeAgent` calls `LlmClient` with the configured code generation model
+- `ReviewAgent` calls `LlmClient` with the configured review model
 
 Possible future implementations:
 - another local LLM runtime client
@@ -96,8 +96,9 @@ Agents catch this exception through their execution error handling and convert i
 `OllamaClient` is the current implementation of `LlmClient`.
 Its role is to communicate with the local Ollama runtime through its HTTP API.
 
-Current default endpoint:
-- base URL → `http://localhost:11434`
+Current endpoint configuration:
+- base URL → loaded from `application.properties` through `ApplicationConfigLoader`
+- default base URL → `http://localhost:11434`
 - generation endpoint → `/api/generate`
 
 The client uses Java's `HttpClient` to create and send synchronous HTTP requests.
@@ -127,7 +128,7 @@ If Ollama returns a non-successful HTTP status, `OllamaClient` throws an `LlmCli
 Unexpected network, JSON parsing, or client-side failures are also wrapped into `LlmClientException`.
 
 The current implementation is shared by all text-based agents.
-`App.kt` creates one `OllamaClient` instance and injects it into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`.
+`App.kt` creates one `OllamaClient` instance using the configured Ollama base URL and injects it into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`.
 
 
 ## 📦 Ollama DTOs
@@ -147,7 +148,6 @@ Example model values:
 - `qwen3:8b`
 - `qwen2.5-coder:14b`
 - `deepseek-coder-v2:16b`
-- `mistral:7b`
 
 The JSON configuration uses `encodeDefaults = true` to ensure that the default `stream = false` value is included in the request.
 Without this configuration, Ollama would use streaming mode and return multiple JSON objects.
@@ -177,6 +177,8 @@ The client currently uses:
 ## 🔄 Current Client Workflow
 
 The current client workflow is:
+
+Before generation starts, `ApplicationConfigLoader` loads the Ollama base URL and model names from `application.properties`. `App.kt` uses this configuration to create `OllamaClient` and inject model names into the active agents.
 1. An agent calls `LlmClient.generate()`.
 2. `OllamaClient` creates an `OllamaGenerateRequest`.
 3. Kotlinx Serialization converts the request object into JSON.
@@ -208,8 +210,6 @@ The current client integration successfully generates local model responses, but
 - execution duration is not stored
 - detailed Ollama metadata is ignored
 - client errors are converted into failed executable agent results or planning fallback decisions, but advanced recovery strategies are not implemented
-- configuration is not yet loaded dynamically from `application.properties`
-- model configuration is partially manual and still evolving while planning, code, and review models are being tested
 
 
 ## 🚀 Future Responsibilities
@@ -226,7 +226,7 @@ Possible future improvements:
 - record token usage and execution duration
 - enrich `LlmClientException` with structured error codes
 - improve client failure diagnostics
-- load the base URL from `application.properties`
+- support environment-specific configuration profiles
 - expand fake client implementations for more client failure scenarios
 - add a `ComfyUiClient` for image and video workflows
 - support multiple local or remote providers

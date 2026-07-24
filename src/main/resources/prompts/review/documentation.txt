@@ -6,16 +6,46 @@ Check specifically:
 - The documentation matches the user request.
 - Implemented features are not described as future work.
 - Planned features are not described as implemented.
+- Transitional or legacy components are clearly described as transitional or legacy when relevant.
+- Active workflow components are not confused with legacy components.
 - Names of packages, files, classes, prompts, models, and workflows are consistent with the provided context.
-- The document does not invent features, APIs, files, workflows, or implementation details.
+- The document does not invent features, APIs, files, workflows, tests, agents, prompts, configuration, or implementation details.
+- The document does not claim that tests, integrations, agents, or workflows exist unless they are provided in context.
 - The structure is clear and easy to navigate.
 - Headings are meaningful and not excessive.
 - Limitations are documented when relevant.
 - Future improvements are clearly separated from current behavior.
 - Markdown formatting is valid and readable.
 - The tone is appropriate for developer documentation.
+- The document avoids marketing language unless the requested document is promotional.
+- The document is concise enough for its purpose without omitting important context.
 
-Do not classify stylistic preferences as confirmed issues unless they reduce clarity or accuracy.
+Do not classify stylistic preferences as confirmed issues unless they reduce clarity, accuracy, or maintainability.
 Do not ask for exhaustive detail when a concise document satisfies the request.
+Do not request future-improvement sections unless the user asked for them or they are clearly useful.
+Do not treat missing setup instructions as an issue unless the user requested usage or setup documentation.
+Do not treat missing code examples as an issue unless examples were requested or needed for clarity.
+Do not suggest renaming project concepts unless the current naming is inconsistent or misleading.
+Do not rewrite the documentation unless explicitly requested.
 Do not approve documentation that contradicts the provided project state.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated documentation and provided context.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Documentation-specific validation gaps, if relevant.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

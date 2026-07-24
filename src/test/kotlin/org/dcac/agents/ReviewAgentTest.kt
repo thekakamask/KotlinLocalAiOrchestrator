@@ -2,9 +2,11 @@ package org.dcac.agents
 
 import org.dcac.client.LlmClientException
 import org.dcac.fakeData.FakeLlmClient
+import org.dcac.fakeData.FakeOrchestrationLogger
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
+import org.dcac.prompts.PromptDomain
 import org.dcac.prompts.PromptLoader
 import org.dcac.prompts.PromptSelector
 import kotlin.test.Test
@@ -20,7 +22,9 @@ class ReviewAgentTest {
         return ReviewAgent(
             llmClient = fakeLlmClient,
             promptLoader = PromptLoader(),
-            promptSelector = PromptSelector()
+            promptSelector = PromptSelector(),
+            logger = FakeOrchestrationLogger(),
+            model = "deepseek-coder-v2:16b"
         )
     }
 
@@ -35,7 +39,8 @@ class ReviewAgentTest {
 
         val context = ExecutionContext(
             projectPath = ".",
-            agentOutputs = mapOf("code" to "generated code")
+            agentOutputs = mapOf("code" to "generated code"),
+            promptDomain = PromptDomain.MODEL
         )
 
         val result = agent.run(
@@ -52,7 +57,7 @@ class ReviewAgentTest {
     }
 
     @Test
-    fun run_withModelTask_usesModelReviewPrompt() {
+    fun run_withModelPromptDomain_usesModelReviewPrompt() {
         val fakeLlmClient = FakeLlmClient()
         val agent = createAgent(fakeLlmClient)
 
@@ -60,7 +65,8 @@ class ReviewAgentTest {
             task = FakeTasks.validCodeTask(),
             context = ExecutionContext(
                 projectPath = ".",
-                agentOutputs = mapOf("code" to "generated code")
+                agentOutputs = mapOf("code" to "generated code"),
+                promptDomain = PromptDomain.MODEL
             )
         )
 
@@ -72,7 +78,7 @@ class ReviewAgentTest {
     }
 
     @Test
-    fun run_withRoomTask_usesRoomReviewPrompt() {
+    fun run_withRoomPromptDomain_usesRoomReviewPrompt() {
         val fakeLlmClient = FakeLlmClient()
         val agent = createAgent(fakeLlmClient)
 
@@ -86,7 +92,8 @@ class ReviewAgentTest {
             task = roomTask,
             context = ExecutionContext(
                 projectPath = ".",
-                agentOutputs = mapOf("code" to "generated room code")
+                agentOutputs = mapOf("code" to "generated room code"),
+                promptDomain = PromptDomain.ROOM
             )
         )
 
@@ -106,7 +113,8 @@ class ReviewAgentTest {
             task = FakeTasks.validCodeTask(),
             context = ExecutionContext(
                 projectPath = ".",
-                agentOutputs = mapOf("code" to "generated code")
+                agentOutputs = mapOf("code" to "generated code"),
+                promptDomain = PromptDomain.MODEL
             )
         )
 
@@ -127,7 +135,10 @@ class ReviewAgentTest {
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.MODEL
+            )
         )
 
         assertTrue(result.success)
@@ -150,7 +161,8 @@ class ReviewAgentTest {
             task = FakeTasks.validCodeTask(),
             context = ExecutionContext(
                 projectPath = ".",
-                agentOutputs = mapOf("code" to "generated code")
+                agentOutputs = mapOf("code" to "generated code"),
+                promptDomain = PromptDomain.MODEL
             )
         )
 
@@ -174,7 +186,8 @@ class ReviewAgentTest {
             task = FakeTasks.validCodeTask(),
             context = ExecutionContext(
                 projectPath = ".",
-                agentOutputs = mapOf("code" to "generated code")
+                agentOutputs = mapOf("code" to "generated code"),
+                promptDomain = PromptDomain.MODEL
             )
         )
 

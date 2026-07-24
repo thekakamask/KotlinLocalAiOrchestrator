@@ -15,11 +15,37 @@ Retrofit rules:
 - Use suspend functions for API calls when appropriate.
 - Use DTOs for network request and response payloads when useful.
 - Keep DTOs separate from domain models when mapping is relevant.
-- Include path, query, body, and header annotations only when needed.
-- Do not hardcode secrets, API keys, tokens, or environment-specific credentials.
-- Avoid exposing Retrofit response details directly to UI code when a repository or data source is expected.
+- Include path, query, body, header, and multipart annotations only when needed.
+- Use @GET, @POST, @PUT, @PATCH, @DELETE, @Path, @Query, @Body, and @Header correctly.
+- Do not include @Body on GET requests.
+- Do not use dynamic headers for secrets or tokens unless the user explicitly requests authentication handling.
+- Do not hardcode secrets, API keys, tokens, base URLs for production, or environment-specific credentials.
+- Use Response<T> when the caller needs status codes, headers, or error-body handling.
+- Return T directly when a simple successful body is enough and error handling is handled elsewhere.
 - Handle errors explicitly when the request includes repository or production-ready behavior.
-- Do not add Room, Firebase, DataStore, ViewModel, Compose UI, or DI code unless requested.
-- Do not invent caching, synchronization, or pagination unless requested.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not swallow network exceptions silently.
+- Do not block threads while making network calls.
+- Do not use runBlocking for Retrofit calls.
+- Use Retrofit converters such as Kotlinx Serialization, Moshi, or Gson only when requested or clearly needed.
+- Do not mix serialization libraries without a reason.
+- If Kotlinx Serialization is used, include @Serializable on DTOs.
+- Avoid exposing Retrofit, Response<T>, raw JSON, or HTTP details directly to UI code when a repository or data source is expected.
+- Do not add OkHttp interceptors, logging, authentication, caching, synchronization, pagination, retry logic, or offline mode unless requested.
+- Do not add Room, Firebase, DataStore, ViewModel, Compose UI, navigation, or dependency injection code unless requested.
+- Do not invent API endpoints, fields, or response shapes beyond what is reasonably needed for the request.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable Retrofit API access implementation and briefly state assumptions.
+
+Retrofit setup rules:
+- Only include Retrofit builder setup when the user asks for client setup, repository setup, or a complete API access example.
+- Ensure baseUrl ends with a trailing slash when showing Retrofit.Builder.
+- Do not create dependency injection modules unless requested.
+- Do not create an Android Application class unless requested.
+
+Output rules:
+- Provide only the requested Retrofit API access implementation.
+- Do not include unrelated persistence, UI, dependency injection, synchronization, or local caching layers.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

@@ -2,9 +2,11 @@ package org.dcac.agents
 
 import org.dcac.client.LlmClientException
 import org.dcac.fakeData.FakeLlmClient
+import org.dcac.fakeData.FakeOrchestrationLogger
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
+import org.dcac.prompts.PromptDomain
 import org.dcac.prompts.PromptLoader
 import org.dcac.prompts.PromptSelector
 import kotlin.test.Test
@@ -20,10 +22,11 @@ class CodeAgentTest {
         return CodeAgent(
             llmClient = fakeLlmClient,
             promptLoader = PromptLoader(),
-            promptSelector = PromptSelector()
+            promptSelector = PromptSelector(),
+            logger = FakeOrchestrationLogger(),
+            model = "qwen2.5-coder:14b"
         )
     }
-
 
     @Test
     fun run_whenLlmClientSucceeds_returnsSuccessfulAgentResult() {
@@ -36,7 +39,10 @@ class CodeAgentTest {
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.MODEL
+            )
         )
 
         assertTrue(result.success)
@@ -48,13 +54,16 @@ class CodeAgentTest {
     }
 
     @Test
-    fun run_withModelTask_usesModelCodePrompt() {
+    fun run_withModelPromptDomain_usesModelCodePrompt() {
         val fakeLlmClient = FakeLlmClient()
         val agent = createAgent(fakeLlmClient)
 
         agent.run(
             task = FakeTasks.validCodeTask(),
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.MODEL
+            )
         )
 
         assertContains(
@@ -65,7 +74,7 @@ class CodeAgentTest {
     }
 
     @Test
-    fun run_withRoomTask_usesRoomCodePrompt() {
+    fun run_withRoomPromptDomain_usesRoomCodePrompt() {
         val fakeLlmClient = FakeLlmClient()
         val agent = createAgent(fakeLlmClient)
 
@@ -77,7 +86,10 @@ class CodeAgentTest {
 
         agent.run(
             task = roomTask,
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.ROOM
+            )
         )
 
         assertContains(
@@ -94,7 +106,10 @@ class CodeAgentTest {
 
         agent.run(
             task = FakeTasks.validCodeTask(),
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.MODEL
+            )
         )
 
         assertContains(
@@ -113,7 +128,10 @@ class CodeAgentTest {
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.MODEL
+            )
         )
 
         assertFalse(result.success)
@@ -134,7 +152,10 @@ class CodeAgentTest {
 
         val result = agent.run(
             task = FakeTasks.validCodeTask(),
-            context = ExecutionContext(projectPath = ".")
+            context = ExecutionContext(
+                projectPath = ".",
+                promptDomain = PromptDomain.MODEL
+            )
         )
 
         assertFalse(result.success)

@@ -5,20 +5,60 @@ Review generated Kotlin synchronization code against the original user request, 
 Check specifically:
 - The code would compile as Kotlin.
 - WorkManager is used when background synchronization is required.
+- CoroutineWorker is used appropriately when coroutine-based work is generated.
+- OneTimeWorkRequestBuilder is used for one-shot sync when appropriate.
+- PeriodicWorkRequestBuilder is used only when recurring sync is requested.
+- WorkManager constraints are used when network-dependent background sync requires network availability.
+- Unique work policies are used when duplicate scheduled sync work would be a problem.
 - Upload and download responsibilities are separated when bidirectional sync is requested.
 - Sync status is represented clearly when useful.
 - Synchronization orchestration is not tightly coupled to unrelated UI code.
+- Synchronization orchestration is not unnecessarily coupled to concrete Room, Firebase, Retrofit, or DataStore implementations when abstractions are expected.
 - Blocking calls are avoided during synchronization work.
+- runBlocking is not used inside sync execution.
+- suspend functions or coroutine-friendly APIs are used when appropriate.
 - Failure states are handled when production-ready behavior is requested.
-- Retry behavior is bounded or delegated safely.
+- Result.success(), Result.retry(), and Result.failure() are used correctly in Worker code.
+- Retry behavior is bounded or delegated safely to WorkManager policy.
+- Infinite retry loops are avoided.
+- Sync operations are idempotent when repeated execution is possible.
+- The code avoids duplicating local or remote records during repeated sync attempts.
 - The code avoids destructive overwrites unless explicitly requested.
 - Conflict-resolution assumptions are stated when local and remote data may diverge.
 - Complex conflict resolution is not invented unless requested.
-- The code does not add UI, Compose, ViewModel, or DI code unless requested.
+- Large payloads are not passed through WorkManager Data.
+- The code does not add UI, Compose, ViewModel, Room, Firebase, Retrofit, DataStore, navigation, or DI code unless requested.
 - Imports are valid and not placed in the middle of a single Kotlin file.
 - The implementation stays within the scope of the original user request.
 
 Do not classify missing complex conflict resolution as a confirmed issue unless the user requested it.
 Do not classify missing UI feedback as a confirmed issue unless the user requested UI behavior.
+Do not classify missing WorkManager as a confirmed issue when the request is for foreground/manual synchronization only.
+Do not classify missing periodic sync as a confirmed issue unless recurring sync was requested.
+Do not classify missing dependency injection as a confirmed issue unless the user requested DI.
+Do not classify missing concrete Room, Firebase, Retrofit, or DataStore implementations as confirmed issues when the request is only for synchronization orchestration.
+Do not classify missing retry behavior as a confirmed issue unless production-ready failure handling was requested or the code has unsafe retry behavior.
+Do not require advanced conflict resolution when a simple stated assumption satisfies the request.
+Do not regenerate the full synchronization implementation unless explicitly requested.
 Do not approve code that would not compile.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated code.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Relevant missing tests, if any.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

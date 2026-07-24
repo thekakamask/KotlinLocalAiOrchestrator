@@ -19,15 +19,21 @@ Hard rules:
 - If previous workflow context caused invalid guidance, report it as a planning or context issue.
 - If the generated code follows previous workflow context but violates the original user request or target-language rules, report it as an issue.
 - For Kotlin, do not classify nullable types as NullPointerException risks unless the code dereferences them unsafely.
-- For Kotlin data classes, do not suggest manually adding generated methods such as `equals`, `hashCode`, `toString`, getters, or setters.
-- Do not suggest nullable types unless nullability is required or clearly justified.
+- For Kotlin, do not suggest nullable types unless nullability is required or clearly justified.
+- For Kotlin data classes, do not suggest manually adding generated methods such as equals, hashCode, toString, componentN, copy, getters, or setters.
+- For Kotlin data classes, do not classify the absence of validation logic as an issue unless validation was requested or invalid values make the object unusable.
 - Do not warn about mutable collections unless the generated code actually uses mutable collections or exposes mutable state.
+- Do not recommend try-catch blocks unless there is a concrete failure boundary that should be handled at that layer.
+- Do not recommend extra architecture layers unless the original request requires them.
+- Do not classify missing dependency injection, logging, tests, documentation, comments, configuration, persistence, networking, or UI as confirmed issues unless requested or clearly required.
+- Do not treat a concise implementation as incomplete only because more features could exist.
 
 Scope and assumptions:
 - Distinguish between explicit user requirements, reasonable assumptions, and unnecessary scope expansion.
 - Reasonable assumptions are acceptable when the user request is vague and the generated code stays focused.
 - Report scope expansion only when added elements introduce complexity, risk, unrelated behavior, framework coupling, infrastructure concerns, or conflict with the user request.
 - Do not treat useful minimal assumptions as confirmed issues.
+- Treat missing context as a speculative risk, not a confirmed issue, unless the generated code is clearly wrong.
 
 Review checklist:
 - correctness against the original user request

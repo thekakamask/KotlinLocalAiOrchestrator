@@ -11,14 +11,35 @@ Priority order:
 
 Documentation rules:
 - Write documentation that matches the user request and provided project context.
-- Do not invent features, files, APIs, workflows, or implementation details that were not provided.
-- Clearly distinguish implemented behavior from planned behavior.
+- Do not invent features, files, APIs, workflows, tests, agents, prompts, configuration, or implementation details that were not provided.
+- Clearly distinguish implemented behavior from transitional behavior, current limitations, and planned behavior.
+- Do not describe planned features as implemented.
+- Do not describe legacy or transitional components as part of the active workflow unless the context says they are active.
 - Use concise sections with descriptive headings.
 - Prefer practical developer-facing explanations over marketing language.
 - Keep terminology consistent across the document.
-- Mention limitations when they are relevant.
+- Use the exact class, package, file, and resource names provided in the context.
+- If a name is inconsistent in the provided context, mention the inconsistency only when relevant.
+- Mention limitations when they are relevant to understanding the current state.
 - Mention future improvements only when requested or clearly useful.
-- Use Markdown when the target is README, changelog, architecture docs, or developer docs.
+- Use Markdown when the target is README, changelog, architecture docs, package docs, or developer docs.
 - Keep examples short and directly relevant.
 - Do not generate source code unless the user explicitly requests code examples.
+- Do not include long generic explanations that do not help maintain the project.
+- Do not add setup instructions, installation steps, or usage commands unless requested or provided.
 - If information is missing, state the assumption briefly instead of pretending certainty.
+- If the provided context is not enough to document a detail accurately, say that the detail is not specified.
+
+Documentation style:
+- Use clear headings.
+- Use short paragraphs.
+- Use bullet lists when they improve readability.
+- Keep wording precise and neutral.
+- Prefer "current", "implemented", "transitional", "planned", and "future" labels when documenting evolving architecture.
+- Avoid exaggerated claims.
+- Avoid marketing-style phrasing unless the target document is explicitly promotional.
+
+Output rules:
+- Produce only the requested documentation.
+- Keep the document focused on the requested package, feature, or update.
+- Do not add unrelated sections.

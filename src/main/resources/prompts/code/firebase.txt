@@ -12,16 +12,43 @@ Priority order:
 Firebase rules:
 - Use Firestore when the user mentions Firestore, collections, documents, or Firebase cloud data.
 - Use Realtime Database only when the user explicitly requests it.
+- Use Firebase Storage, Authentication, Cloud Functions, or Messaging only when explicitly requested.
 - Keep Firebase access inside a focused repository or data source when architecture is requested.
 - Use clear collection and document path names.
+- Avoid scattering collection path strings across unrelated classes.
 - Represent remote data with explicit DTOs or data models when useful.
+- Use no-argument constructors or default property values when needed for Firebase object mapping.
 - Map Firebase documents to Kotlin models safely.
 - Handle missing documents and empty query results explicitly when relevant.
-- Prefer suspend functions or Flow wrappers for asynchronous Firebase operations when appropriate.
-- Avoid exposing Firebase SDK objects directly to UI code.
+- Preserve document ids when the model needs to reference or update existing remote documents.
+- Prefer suspend functions with kotlinx-coroutines-play-services await() for one-shot Firebase operations when appropriate.
+- Prefer Flow or callbackFlow only for realtime listener-based updates when realtime observation is requested or clearly useful.
+- Use awaitClose when using callbackFlow with snapshot listeners.
+- Remove Firebase listeners properly when using listener-based APIs.
 - Do not block threads while waiting for Firebase operations.
-- Do not hardcode secrets, API keys, or environment-specific credentials.
-- Do not add Room, Retrofit, DataStore, ViewModel, Compose UI, or DI code unless requested.
+- Do not use runBlocking for Firebase calls.
+- Avoid exposing Firebase SDK objects such as DocumentSnapshot, QuerySnapshot, DocumentReference, or FirebaseFirestore directly to UI code.
+- Do not hardcode secrets, API keys, environment-specific credentials, project ids, or user ids.
+- Do not implement Firebase Security Rules unless explicitly requested.
+- Do not invent authentication flows unless the user requests authentication.
 - Do not invent synchronization logic unless the user requests sync between local and remote data.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not add Room, Retrofit, DataStore, ViewModel, Compose UI, navigation, or dependency injection code unless requested.
+- Do not create fake local caches unless requested.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable Firebase data access implementation and briefly state assumptions.
+
+Firestore rules:
+- Use collection() and document() paths clearly.
+- Use set(), add(), update(), delete(), get(), and where queries appropriately.
+- Use transactions or batched writes only when atomic multi-document behavior is requested or clearly required.
+- Do not use broad collection reads when the user asks for a specific document.
+- Do not assume every document exists.
+- Do not assume nullable Firestore fields are non-null unless the request or model requires them.
+
+Output rules:
+- Provide only the requested Firebase data access implementation.
+- Do not include unrelated local database, UI, networking, dependency injection, or synchronization layers.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

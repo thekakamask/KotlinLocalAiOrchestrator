@@ -19,12 +19,29 @@ Compose UI rules:
 - Keep composables small enough to be readable, but do not over-split prematurely.
 - Use Modifier parameters for reusable composables.
 - Put Modifier as the first optional parameter when appropriate.
+- Pass events upward through callback parameters instead of embedding business behavior in UI.
 - Avoid hardcoded business logic inside composables.
 - Avoid launching long-running work directly from composables unless explicitly requested.
-- Use remember only for UI-local state.
-- Use LaunchedEffect only when side effects are needed.
-- Do not add ViewModel, Repository, Room, Retrofit, Firebase, DataStore, or DI code unless requested.
+- Use remember only for UI-local state that truly belongs inside the composable.
+- Use rememberSaveable only when state should survive configuration changes and the value is saveable.
+- Use LaunchedEffect only when side effects are needed and key it deliberately.
+- Use LazyColumn or LazyRow for dynamic lists.
+- Use Column, Row, Box, Surface, Card, Text, Button, IconButton, TextField, Scaffold, TopAppBar, and other Material 3 components when they fit the request.
+- Keep accessibility in mind by using clear text, labels, and content descriptions when icons or images are interactive.
+- Do not use deprecated Material 2 APIs when Material 3 is requested.
+- Do not mix Material 2 and Material 3 imports unless explicitly requested.
+- Do not add ViewModel, Repository, Room, Retrofit, Firebase, DataStore, navigation, or dependency injection code unless requested.
 - Do not invent navigation structure unless requested.
-- Do not add preview functions unless requested or clearly useful.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not invent fake domain layers or fake data sources unless needed for a self-contained UI example.
+- Do not add preview functions unless requested or clearly useful for understanding the component.
+- If a preview is included, keep it simple and clearly separated from production composables.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable UI component and briefly state assumptions.
+
+Output rules:
+- Provide only the requested Compose UI implementation.
+- Do not include unrelated architecture, persistence, networking, or dependency injection code.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

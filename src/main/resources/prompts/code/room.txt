@@ -11,14 +11,54 @@ Priority order:
 Room rules:
 - Use @Entity for database tables.
 - Use @PrimaryKey for primary keys.
+- Use stable table names when useful.
+- Use clear column names when needed for readability or relationship mapping.
 - For one-to-many relationships, put the foreign key on the child entity.
 - Use ForeignKey on the child entity when defining parent-child relationships.
 - Add an Index on foreign key columns when appropriate.
 - Use @Embedded for the parent object in relationship wrapper classes.
 - Use @Relation for child collections.
 - Use @Transaction on DAO queries that return relationship objects.
+- Use @Transaction on DAO methods that insert or update multiple related entities atomically.
 - Do not mutate val properties after object creation.
 - If an inserted parent id must be assigned to child items, create copied child objects with the new parent id.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Prefer suspend functions for one-shot DAO writes and reads.
+- Use Flow only when observable database updates are useful or requested.
+- Do not use Flow for every DAO method by default.
 - Prefer simple Room-compatible types unless converters are requested.
-- Do not add UI, ViewModel, Repository, or DI code unless requested.
+- Do not use LocalDate, LocalDateTime, Instant, UUID, BigDecimal, lists, maps, or custom objects in entities unless converters are requested or provided.
+- If non-Room-compatible types are required, mention that a TypeConverter is needed.
+- Keep relationship wrapper classes separate from @Entity classes.
+- Do not annotate relationship wrapper classes with @Entity.
+- Do not use @Relation inside @Entity classes.
+- Do not create many-to-many cross-reference tables unless the relationship is many-to-many or explicitly requested.
+- Do not add Repository, ViewModel, Compose UI, Retrofit, Firebase, DataStore, navigation, or dependency injection code unless requested.
+- Do not invent migrations unless requested.
+- Do not add destructive migration logic unless requested.
+- Do not add try-catch blocks inside DAO interfaces.
+- Do not hardcode Android Context usage inside entities or DAOs.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
+- If the request is vague, create a small, reasonable Room persistence implementation and briefly state assumptions.
+
+DAO rules:
+- Use @Dao for DAO interfaces.
+- Use @Insert, @Update, @Delete, and @Query appropriately.
+- Use OnConflictStrategy only when it is requested or clearly useful.
+- Do not use REPLACE blindly when it may delete and recreate rows unexpectedly.
+- Return inserted row ids when parent-child insertion needs generated parent ids.
+- Use SQL queries that match the declared table and column names.
+- For relationship queries, query the parent table and let @Relation load children.
+
+Database rules:
+- Use @Database with the correct entity list and version.
+- Extend RoomDatabase.
+- Expose abstract DAO functions.
+- Include exportSchema only when requested or when useful for a complete example.
+
+Output rules:
+- Provide only the requested Room persistence code.
+- Do not include unrelated UI, ViewModel, Repository, networking, remote sync, or dependency injection layers.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

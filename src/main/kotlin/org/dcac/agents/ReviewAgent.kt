@@ -3,6 +3,7 @@ package org.dcac.agents
 
 // Import the runtime context shared with agents during execution.
 import org.dcac.client.LlmClient
+import org.dcac.logging.OrchestrationLogger
 import org.dcac.models.ExecutionContext
 // Import the task model received by this agent.
 import org.dcac.models.OrchestrationTask
@@ -19,8 +20,9 @@ class ReviewAgent(
     private val llmClient: LlmClient,
     private val promptLoader: PromptLoader,
     private val promptSelector: PromptSelector,
+    private val logger: OrchestrationLogger,
     // Local model used by the review agent.
-    private val model: String = "deepseek-coder-v2:16b"
+    private val model: String
 ) : Agent {
     // Stable identifier used by the orchestrator and final results.
     override val id: String = "review"
@@ -32,7 +34,7 @@ class ReviewAgent(
             // Read the code output produced by the CodeAgent.
             val generatedCode = context.agentOutputs["code"]
 
-            // Build a richer review prompt using the original request, the manager plan, and the generated code.
+            // Build a richer review prompt using the original request and the generated code.
             val userPrompt = """
              User instruction:
              ${task.instruction}
@@ -44,13 +46,15 @@ class ReviewAgent(
              Focus on correctness, maintainability, missing requirements, risks, and concrete improvements.
              """.trimIndent()
 
-            val promptDomain = promptSelector.detectDomain(task.instruction)
+            val promptDomain = context.promptDomain
 
             val promptPath = promptSelector.reviewPromptPathFor(promptDomain)
 
-            println()
-            println("Review prompt domain: $promptDomain")
-            println("Review prompt path: $promptPath")
+            logger.promptSelected(
+                agentId = id,
+                promptDomain = promptDomain,
+                promptPath = promptPath
+            )
 
             val systemPrompt = promptLoader.loadPrompt(promptPath)
 

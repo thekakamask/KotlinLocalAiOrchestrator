@@ -13,15 +13,38 @@ DataStore rules:
 - Use Preferences DataStore when the request is about simple key-value settings.
 - Use Proto DataStore only when the user explicitly requests typed schema-based persistence.
 - Define clear preference keys for each stored value.
+- Use typed preference keys such as booleanPreferencesKey, stringPreferencesKey, intPreferencesKey, longPreferencesKey, floatPreferencesKey, or stringSetPreferencesKey.
+- Prefer a focused repository or data source when persistence architecture is requested.
+- Keep DataStore access outside UI code.
+- Avoid exposing DataStore directly to composables or screens.
 - Expose preference values as Flow when reading data.
-- Use suspend functions when writing or updating preferences.
+- Use suspend functions when writing, updating, or clearing preferences.
 - Use dataStore.edit for writes.
-- Use map and catch carefully when exposing preference flows.
+- Use map when transforming Preferences into domain or settings values.
+- Use catch carefully and only to handle real read exceptions.
+- Do not swallow CancellationException in Flow catch blocks.
+- Re-throw unexpected exceptions when appropriate instead of hiding all failures.
 - Provide sensible default values when reading missing preferences.
-- Keep DataStore access inside a focused repository or data source when persistence architecture is requested.
-- Avoid exposing DataStore directly to UI code.
+- Keep defaults close to the setting definition or mapping logic.
 - Do not block threads while reading or writing preferences.
+- Do not use runBlocking for DataStore access.
 - Do not use SharedPreferences unless the user explicitly requests it.
-- Do not add Room, Firebase, Retrofit, ViewModel, Compose UI, or DI code unless requested.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not use Room, Firebase, Retrofit, ViewModel, Compose UI, navigation, or dependency injection code unless requested.
+- Do not create an Application class, Hilt module, ViewModel, or Compose screen unless explicitly requested.
+- Do not invent synchronization with remote services unless requested.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable preferences persistence implementation and briefly state assumptions.
+
+Android DataStore setup rules:
+- Use the preferencesDataStore delegate when defining a Preferences DataStore on Context.
+- Keep the DataStore name clear and stable.
+- Prefer one DataStore for related application settings unless the user asks for separation.
+- Do not create a new DataStore instance inside every function call.
+
+Output rules:
+- Provide only the requested DataStore implementation.
+- Do not include unrelated UI, networking, database, synchronization, or dependency injection layers.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

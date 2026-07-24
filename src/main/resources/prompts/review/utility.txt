@@ -6,17 +6,50 @@ Check specifically:
 - The code would compile as Kotlin.
 - The utility has one clear responsibility.
 - Function and class names clearly describe behavior.
+- Generic names such as Utils, Helper, Manager, or Common are avoided unless the scope is genuinely narrow and clear.
+- Simple stateless helpers are implemented as top-level functions when appropriate.
+- Objects or classes are used only when grouping, configuration, state, or dependency injection is useful.
+- Extension functions make call sites clearer and do not hide surprising behavior.
 - The implementation avoids hidden side effects.
 - The implementation avoids global mutable state.
+- The implementation does not read files, environment variables, system properties, network resources, current time, random values, or global state unless requested.
+- The implementation avoids logging or printing unless requested.
 - Input handling is appropriate for the requested behavior.
 - Exceptions are used only when appropriate.
+- Expected recoverable failures are represented clearly when relevant.
+- The utility is deterministic when possible.
 - The utility is not over-engineered.
 - Unrelated helpers are not grouped together into a vague utility class.
-- The code does not add Android framework, Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, or DI code unless requested.
+- The code does not add Android framework, Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, navigation, or DI code unless requested.
 - Imports are valid and not placed in the middle of a single Kotlin file.
 - The implementation stays within the scope of the original user request.
 
 Do not classify missing abstraction as a confirmed issue when a simple function is enough.
 Do not classify missing class/object wrapper as a confirmed issue for stateless top-level helpers.
+Do not classify missing extension function as a confirmed issue when a regular function is clearer.
+Do not classify missing input validation as a confirmed issue unless invalid input would clearly break the requested behavior or validation was requested.
+Do not classify throwing exceptions as an issue when invalid input represents programmer error and exceptions are idiomatic.
+Do not request generic utility containers or broad helper classes.
+Do not regenerate the full utility implementation unless explicitly requested.
 Do not approve code that would not compile.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated code.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Relevant missing tests, if any.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

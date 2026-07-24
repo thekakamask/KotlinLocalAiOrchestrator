@@ -3,8 +3,10 @@ package org.dcac.orchestrator
 import org.dcac.agents.PlanningAgent
 import org.dcac.fakeData.FakeAgent
 import org.dcac.fakeData.FakeLlmClient
+import org.dcac.fakeData.FakeOrchestrationLogger
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.ExecutionContext
+import org.dcac.prompts.PromptSelector
 import org.dcac.synthesis.ResponseSynthesizer
 import org.dcac.tasks.TaskRouter
 import org.dcac.tasks.TaskValidator
@@ -20,7 +22,7 @@ class AiOrchestratorTest {
         workflowType: String = "CODE_REVIEW",
         complexity: String = "SIMPLE",
         reason: String = "test workflow"
-    ) : FakeLlmClient {
+    ): FakeLlmClient {
         return FakeLlmClient(
             responseText = """
                 {
@@ -34,24 +36,32 @@ class AiOrchestratorTest {
 
     private fun createOrchestrator(
         planningClient: FakeLlmClient = createPlanningClient(),
-        agents : List<FakeAgent>
-    ) : AiOrchestrator {
+        agents: List<FakeAgent>,
+        logger: FakeOrchestrationLogger = FakeOrchestrationLogger()
+    ): AiOrchestrator {
         return AiOrchestrator(
-            router = TaskRouter(agents = agents),
+            router = TaskRouter(
+                agents = agents,
+                logger = logger
+            ),
             validator = TaskValidator(),
             responseSynthesizer = ResponseSynthesizer(),
-            planningAgent = PlanningAgent (
+            planningAgent = PlanningAgent(
                 llmClient = planningClient,
-                systemPrompt = "planning prompt"
+                systemPrompt = "planning prompt",
+                logger = logger,
+                model = "qwen3:8b"
             ),
-            workflowPlanner = WorkflowPlanner()
+            workflowPlanner = WorkflowPlanner(),
+            promptSelector = PromptSelector(),
+            logger = logger
         )
     }
 
     @Test
     fun execute_whenTaskIsInvalid_returnsValidationErrorsAndDoesNotRunPlanningOrAgents() {
         val planningClient = createPlanningClient()
-        val codeAgent = FakeAgent(id="code")
+        val codeAgent = FakeAgent(id = "code")
 
         val orchestrator = createOrchestrator(
             planningClient = planningClient,
@@ -71,14 +81,14 @@ class AiOrchestratorTest {
             ),
             result.errors
         )
-        assertTrue { result.results.isEmpty() }
+        assertTrue(result.results.isEmpty())
         assertEquals(0, planningClient.generalCallCount)
         assertEquals(0, codeAgent.runCount)
     }
 
     @Test
     fun execute_whenPlanningSelectsCodeReview_runsCodeAndReviewAgents() {
-        val codeAgent= FakeAgent(
+        val codeAgent = FakeAgent(
             id = "code",
             output = "generated code"
         )
@@ -243,5 +253,4 @@ class AiOrchestratorTest {
         assertEquals("code", result.results[0].agentId)
         assertEquals("review", result.results[1].agentId)
     }
-
 }

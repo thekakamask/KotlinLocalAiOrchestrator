@@ -1,13 +1,14 @@
 package org.dcac.tasks
 
 import org.dcac.agents.Agent
-import org.dcac.models.OrchestrationTask
+import org.dcac.logging.OrchestrationLogger
 
 /**
  * Selects agents that should process a task.
  */
 class TaskRouter(
-    private val agents: List<Agent>
+    private val agents: List<Agent>,
+    private val logger: OrchestrationLogger
 ) {
 
     // New routing strategy based on a planned ordered list of agent identifiers.
@@ -18,7 +19,7 @@ class TaskRouter(
             }
 
             if (agent == null) {
-                println("Skipped planned agent: $requestedAgentId is not registered")
+                logger.plannedAgentMissing(requestedAgentId)
             }
 
             agent

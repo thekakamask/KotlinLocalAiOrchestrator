@@ -7,18 +7,48 @@ Check specifically:
 - Preferences DataStore is used for simple key-value settings.
 - Proto DataStore is only used when typed schema-based persistence is requested.
 - Preference keys are defined clearly.
+- Typed preference keys are used correctly.
 - Reads expose Flow when continuous observation is appropriate.
 - Writes use suspend functions and dataStore.edit.
 - Missing preferences have sensible default values.
+- Flow transformations from Preferences to settings or domain values are clear.
 - Flow error handling is reasonable when included.
-- The code does not block threads for DataStore operations.
+- Flow catch blocks do not swallow CancellationException.
+- DataStore operations do not block threads.
+- runBlocking is not used for DataStore access.
+- The DataStore instance is not recreated inside every function call.
 - DataStore access is not exposed directly to UI code when a repository or data source is expected.
 - SharedPreferences is not used unless explicitly requested.
-- The code does not add Room, Firebase, Retrofit, ViewModel, Compose UI, or DI code unless requested.
+- The code does not add Room, Firebase, Retrofit, ViewModel, Compose UI, navigation, or DI code unless requested.
 - Imports are valid and not placed in the middle of a single Kotlin file.
 - The implementation stays within the scope of the original user request.
 
 Do not classify missing Proto DataStore as a confirmed issue for simple preferences.
 Do not classify missing dependency injection as a confirmed issue unless the user requested DI.
+Do not classify missing ViewModel or Compose UI integration as a confirmed issue unless the user requested UI integration.
+Do not classify missing repository as a confirmed issue when the user requested only a minimal DataStore example.
+Do not classify absence of Flow catch as a confirmed issue unless the request required production error handling or the code mishandles errors.
+Do not suggest SharedPreferences migration unless migration was requested or clearly relevant.
+Do not regenerate the full DataStore implementation unless explicitly requested.
 Do not approve code that would not compile.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated code.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Relevant missing tests, if any.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

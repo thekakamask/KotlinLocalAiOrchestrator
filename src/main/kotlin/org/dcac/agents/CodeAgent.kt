@@ -3,6 +3,7 @@ package org.dcac.agents
 
 // Import the runtime context shared with agents during execution.
 import org.dcac.client.LlmClient
+import org.dcac.logging.OrchestrationLogger
 import org.dcac.models.ExecutionContext
 // Import the task model received by this agent.
 import org.dcac.models.OrchestrationTask
@@ -19,8 +20,9 @@ class CodeAgent(
     private val llmClient: LlmClient,
     private val promptLoader: PromptLoader,
     private val promptSelector: PromptSelector,
+    private val logger: OrchestrationLogger,
     // Local model used by the code agent.
-    private val model: String = "qwen2.5-coder:14b"
+    private val model: String
 ) : Agent {
     // Stable identifier used by the orchestrator and final results.
     override val id: String = "code"
@@ -37,13 +39,15 @@ class CodeAgent(
             Generate only the implementation based on the user instruction.
             """.trimIndent()
 
-            val promptDomain = promptSelector.detectDomain(task.instruction)
+            val promptDomain = context.promptDomain
 
             val promptPath = promptSelector.codePromptPathFor(promptDomain)
 
-            println()
-            println("Code prompt domain: $promptDomain")
-            println("Code prompt path: $promptPath")
+            logger.promptSelected(
+                agentId = id,
+                promptDomain = promptDomain,
+                promptPath = promptPath
+            )
 
             val systemPrompt = promptLoader.loadPrompt(promptPath)
 

@@ -124,7 +124,7 @@ Additional future tests may cover:
 - Future workflow types may temporarily resolve to `code` and `review` only.
 - The planner does not yet distinguish required agents from optional agents.
 - The planner does not yet include dependency metadata between agents.
-- The planner does not use prompt domain information.
+- `WorkflowPlanner` does not use prompt domain information; prompt specialization is handled separately through `PromptSelector` and `ExecutionContext`.
 - The planner does not currently influence model selection.
 - The planner does not yet support parallel branches.
 
@@ -137,7 +137,7 @@ Additional future tests may cover:
 - support fallback agent chains
 - support dependency-aware workflows
 - support parallel workflow branches where safe
-- include prompt domain metadata in workflow planning
+- optionally include prompt-domain diagnostics in workflow metadata
 - use complexity to influence workflow depth
 - use complexity to influence model selection
 - add deterministic fast-path workflow decisions before calling the planning model

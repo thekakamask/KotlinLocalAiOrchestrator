@@ -12,8 +12,6 @@ data class OrchestrationTask(
     // Human-readable task title.
     val title: String,
     // Detailed instruction describing what the system should do.
-    val instruction: String,
-    // Task category used by the router to select the right agents.
-    //val type: TaskType = TaskType.GENERAL
+    val instruction: String
 )
 

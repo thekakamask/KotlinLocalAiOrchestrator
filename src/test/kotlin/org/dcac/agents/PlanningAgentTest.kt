@@ -2,19 +2,29 @@ package org.dcac.agents
 
 import org.dcac.client.LlmClientException
 import org.dcac.fakeData.FakeLlmClient
+import org.dcac.fakeData.FakeOrchestrationLogger
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.TaskComplexity
 import org.dcac.models.WorkflowType
-import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class PlanningAgentTest {
 
+    private fun createAgent(fakeLlmClient: FakeLlmClient): PlanningAgent {
+        return PlanningAgent(
+            llmClient = fakeLlmClient,
+            systemPrompt = "planning prompt",
+            logger = FakeOrchestrationLogger(),
+            model = "qwen3:8b"
+        )
+    }
+
     @Test
     fun plan_whenLlmReturnsValidJson_returnsWorkflowPlan() {
-        val agent = PlanningAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 responseText = """
                     {
                       "workflowType": "CODE_REVIEW",
@@ -22,8 +32,7 @@ class PlanningAgentTest {
                       "reason": "Code generation should be reviewed."
                     }
                 """.trimIndent()
-            ),
-            systemPrompt = "planning prompt"
+            )
         )
 
         val plan = agent.plan(FakeTasks.validCodeTask())
@@ -36,24 +45,23 @@ class PlanningAgentTest {
 
     @Test
     fun plan_whenLlmReturnsInvalidJson_returnsFallbackPlan() {
-        val agent = PlanningAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 responseText = "not json"
-            ),
-            systemPrompt = "planning prompt"
+            )
         )
 
         val plan = agent.plan(FakeTasks.validCodeTask())
 
         assertEquals(WorkflowType.CODE_REVIEW, plan.workflowType)
         assertEquals(TaskComplexity.MODERATE, plan.complexity)
-        assertTrue(plan.reason.contains("Fallback workflow selected"))
+        assertContains(plan.reason, "Fallback workflow selected")
     }
 
     @Test
     fun plan_whenWorkflowTypeIsUnknown_returnsFallbackPlan() {
-        val agent = PlanningAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 responseText = """
                     {
                       "workflowType": "UNKNOWN_WORKFLOW",
@@ -61,21 +69,20 @@ class PlanningAgentTest {
                       "reason": "unknown"
                     }
                 """.trimIndent()
-            ),
-            systemPrompt = "planning prompt"
+            )
         )
 
         val plan = agent.plan(FakeTasks.validCodeTask())
 
         assertEquals(WorkflowType.CODE_REVIEW, plan.workflowType)
         assertEquals(TaskComplexity.MODERATE, plan.complexity)
-        assertTrue(plan.reason.contains("Fallback workflow selected"))
+        assertContains(plan.reason, "Fallback workflow selected")
     }
 
     @Test
     fun plan_whenComplexityIsUnknown_returnsFallbackPlan() {
-        val agent = PlanningAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 responseText = """
                     {
                       "workflowType": "CODE_REVIEW",
@@ -83,30 +90,28 @@ class PlanningAgentTest {
                       "reason": "unknown"
                     }
                 """.trimIndent()
-            ),
-            systemPrompt = "planning prompt"
+            )
         )
 
         val plan = agent.plan(FakeTasks.validCodeTask())
 
         assertEquals(WorkflowType.CODE_REVIEW, plan.workflowType)
         assertEquals(TaskComplexity.MODERATE, plan.complexity)
-        assertTrue(plan.reason.contains("Fallback workflow selected"))
+        assertContains(plan.reason, "Fallback workflow selected")
     }
 
     @Test
     fun plan_whenLlmClientFails_returnsFallbackPlan() {
-        val agent = PlanningAgent(
-            llmClient = FakeLlmClient(
+        val agent = createAgent(
+            FakeLlmClient(
                 exception = LlmClientException("client failed")
-            ),
-            systemPrompt = "planning prompt"
+            )
         )
 
         val plan = agent.plan(FakeTasks.validCodeTask())
 
         assertEquals(WorkflowType.CODE_REVIEW, plan.workflowType)
         assertEquals(TaskComplexity.MODERATE, plan.complexity)
-        assertTrue(plan.reason.contains("Fallback workflow selected"))
+        assertContains(plan.reason, "Fallback workflow selected")
     }
 }

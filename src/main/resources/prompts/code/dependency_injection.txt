@@ -14,13 +14,32 @@ Dependency injection rules:
 - Use Dagger only when the user explicitly requests Dagger or a non-Hilt Dagger setup.
 - Use constructor injection when possible.
 - Use @Inject constructors for injectable classes when appropriate.
-- Use @Module and @InstallIn for Hilt modules when bindings or providers are needed.
-- Use @Provides for dependencies that cannot be constructor-injected.
-- Use @Binds for interface-to-implementation bindings when appropriate.
-- Use appropriate Hilt components and scopes when requested or clearly necessary.
-- Avoid unnecessary modules when constructor injection is enough.
+- Avoid modules when constructor injection is enough.
+- Use @Module and @InstallIn for Hilt modules only when bindings or providers are needed.
+- Use @Provides for dependencies that cannot be constructor-injected, such as third-party builders, framework-created objects, configured clients, databases, or DataStore instances.
+- Use @Binds for interface-to-implementation bindings when the implementation has an injectable constructor.
+- Do not use @Provides for simple interface bindings when @Binds is more appropriate.
+- Do not use @Binds for values that require construction logic.
+- Use appropriate Hilt components such as SingletonComponent, ActivityRetainedComponent, ViewModelComponent, ActivityComponent, or FragmentComponent when requested or clearly necessary.
+- Use @Singleton only for application-wide dependencies.
+- Do not add scopes unless the lifetime requirement is clear.
+- Do not scope dependencies inconsistently with their installed component.
 - Keep object creation centralized only when it improves clarity.
-- Do not add Room, Retrofit, Firebase, DataStore, ViewModel, or Compose UI code unless requested.
+- Prefer small focused modules over large mixed modules when modules are needed.
+- Separate abstract @Binds modules from object @Provides modules when needed for valid Kotlin/Hilt syntax.
+- Use @HiltAndroidApp only when creating or showing the Application class is requested.
+- Use @AndroidEntryPoint only when Android entry point classes are requested.
+- Use hiltViewModel only when Compose or ViewModel integration is explicitly requested.
+- Do not add Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, navigation, or repository code unless requested.
 - Do not invent application architecture beyond the requested dependency wiring.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not create fake implementations unless the user asks for tests, fakes, or examples.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable DI setup and briefly state assumptions.
+
+Output rules:
+- Provide only the requested dependency injection setup.
+- Do not include unrelated persistence, networking, UI, ViewModel, or domain layers.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

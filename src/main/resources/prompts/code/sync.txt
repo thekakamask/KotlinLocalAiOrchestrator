@@ -11,16 +11,46 @@ Priority order:
 
 Synchronization rules:
 - Use WorkManager when background synchronization is requested or clearly required.
+- Use CoroutineWorker for coroutine-based background synchronization.
 - Separate upload and download responsibilities when the request implies bidirectional sync.
 - Represent sync status explicitly when useful.
 - Keep synchronization orchestration separate from low-level Room, Firebase, Retrofit, or DataStore implementations unless those details are requested.
+- Depend on abstractions such as repositories or data sources when the low-level implementations are not requested.
 - Avoid blocking threads during synchronization work.
+- Do not use runBlocking inside synchronization code.
 - Use suspend functions or coroutine-friendly APIs when appropriate.
 - Handle failure states explicitly when production-ready behavior is requested.
 - Avoid infinite retry loops.
+- Use Result.retry() only when retrying is safe and bounded by WorkManager policy.
+- Use Result.failure() for non-recoverable failures.
+- Use Result.success() only after required sync steps complete.
 - Avoid destructive overwrite behavior unless explicitly requested.
 - Mention conflict-resolution assumptions when local and remote data may diverge.
 - Do not invent complex conflict resolution unless requested.
-- Do not add UI, Compose, ViewModel, or DI code unless requested.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Prefer deterministic conflict behavior when a simple assumption is necessary.
+- Keep sync operations idempotent when possible.
+- Avoid duplicating remote or local records during repeated sync attempts.
+- Do not assume network availability unless it is checked or delegated to WorkManager constraints.
+- Use WorkManager constraints when the request includes network-dependent background sync.
+- Do not schedule periodic work with an interval shorter than WorkManager allows.
+- Do not create global managers, schedulers, workers, repositories, and data models all together unless the user requests a complete sync architecture.
+- Do not add Room, Firebase, Retrofit, DataStore, Compose UI, ViewModel, navigation, or dependency injection code unless requested.
+- Do not invent authentication, remote APIs, local schemas, or sync metadata fields unless needed for the requested sync behavior.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable synchronization component and briefly state assumptions.
+
+WorkManager rules:
+- Use OneTimeWorkRequestBuilder for one-shot sync when appropriate.
+- Use PeriodicWorkRequestBuilder only when recurring sync is requested.
+- Use ExistingWorkPolicy or ExistingPeriodicWorkPolicy when unique work is needed.
+- Use Constraints for required network conditions when appropriate.
+- Keep worker input and output data simple.
+- Do not pass large payloads through WorkManager Data.
+
+Output rules:
+- Provide only the requested synchronization code.
+- Do not include unrelated UI, persistence, networking, dependency injection, or full application architecture unless requested.
+- If assumptions are needed, write a short "Assumptions:" section before the code.

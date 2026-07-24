@@ -510,5 +510,108 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - Domain-specific documentation and test prompt families are planned for future dedicated agents
 
 
+### 🔹 **Update #9**
+
+  - 🧠 **Prompt hardening**
+    - Hardened `planning.txt` with clearer workflow-selection rules
+    - Clarified that the planning model must choose workflow type, complexity, and reason without generating implementation details
+    - Strengthened all specialized code prompts with stricter scope-control rules
+    - Strengthened all specialized review prompts with stricter output structure and review guardrails
+    - Added stronger rules against unnecessary architecture, unrelated framework code, fake layers, broad abstractions, and speculative features
+    - Improved review prompts to better separate confirmed issues, optional improvements, speculative risks, and missing tests
+    - Added more domain-specific guardrails for Room, models, Retrofit, Firebase, DataStore, synchronization, dependency injection, ViewModel, Compose UI, tests, documentation, utilities, and general code
+
+  - 🎯 **Centralized prompt domain selection**
+    - Moved prompt-domain detection out of individual agents
+    - Updated `AiOrchestrator` to detect the prompt domain once per task with `PromptSelector`
+    - Added the selected `PromptDomain` to `ExecutionContext`
+    - Updated `CodeAgent` to use `context.promptDomain` when selecting its code prompt
+    - Updated `ReviewAgent` to use `context.promptDomain` when selecting its review prompt
+    - Reduced the risk of different agents detecting different prompt domains for the same task
+    - Prepared prompt-domain context sharing for future agents such as `TestAgent` and `DocumentationAgent`
+
+  - ⚙️ **Runtime configuration loading**
+    - Added the new `org.dcac.config` package
+    - Added `ApplicationConfig` to represent runtime configuration values
+    - Added `ApplicationConfigLoader` to load required values from `application.properties`
+    - Added configuration keys for:
+      - `ollama.baseUrl`
+      - `ollama.models.planning`
+      - `ollama.models.code`
+      - `ollama.models.review`
+    - Updated `OllamaClient` to receive a configurable base URL
+    - Updated `App.kt` to create `OllamaClient` from the configured Ollama base URL
+    - Updated `App.kt` to inject configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`
+    - Removed hardcoded model selection as the primary runtime configuration source
+
+  - 🪵 **Centralized orchestration logging**
+    - Added the new `org.dcac.logging` package
+    - Added `OrchestrationLogger` as the logging abstraction for orchestration events
+    - Added `ConsoleOrchestrationLogger` as the current console-based logger implementation
+    - Replaced scattered internal workflow `println` calls with logger methods
+    - Centralized logs for:
+      - orchestration start and completion
+      - task validation
+      - planning start and completion
+      - planning fallback
+      - selected workflow, complexity, and reason
+      - selected prompt domain
+      - planned agent routing
+      - missing planned agents
+      - selected agents
+      - agent start and completion
+      - selected prompt domain and prompt path per agent
+      - final response synthesis start
+    - Kept `App.kt` responsible for displaying final user-facing results and developer details
+
+  - 🧹 **Legacy cleanup**
+    - Removed the legacy `ManagerAgent`
+    - Removed the legacy `ManagerAgentTest`
+    - Removed the transitional `TaskType`
+    - Removed the transitional `TaskClassifier`
+    - Removed remaining active workflow dependencies on manually selected task types
+    - Cleaned up old manager-oriented assumptions from the active code path
+    - Simplified the architecture around planning-based workflow selection
+
+  - 🧪 **Test realignment**
+    - Added `FakeOrchestrationLogger` for tests that need logger injection without console noise
+    - Updated agent tests to inject explicit model names
+    - Updated `CodeAgentTest` to verify prompt loading from the centralized `ExecutionContext.promptDomain`
+    - Updated `ReviewAgentTest` to verify prompt loading from the centralized `ExecutionContext.promptDomain`
+    - Updated `PlanningAgentTest` to use explicit logger and model injection
+    - Updated `AiOrchestratorTest` to use the logger-aware `TaskRouter`, `PlanningAgent`, and `AiOrchestrator`
+    - Updated tests after removing legacy manager and task-type components
+    - Preserved test coverage for planning fallback, workflow execution, prompt loading, routing, and context sharing
+
+  - ✅ **Runtime validation**
+    - Ran the application through `App.kt` with the updated planning, prompt, config, and logging flow
+    - Verified that a simple Kotlin model request selects:
+      - workflow → `CODE_REVIEW`
+      - complexity → `SIMPLE`
+      - prompt domain → `MODEL`
+      - agents → `code`, `review`
+    - Verified that a Room persistence request selects:
+      - workflow → `CODE_REVIEW`
+      - complexity → `MODERATE`
+      - prompt domain → `ROOM`
+      - agents → `code`, `review`
+    - Verified that configured model names are displayed in agent metadata
+    - Verified that centralized logger output preserves workflow observability
+
+  - ⚠️ **Current workflow limitations**
+    - Planning is still performed by a local LLM and can be slow for simple requests
+    - Prompt-domain detection is centralized, but still keyword-based
+    - Specialized prompts are stronger, but still need more real-world validation across domains
+    - Room code and review behavior still need additional refinement for complex relationship cases
+    - Dedicated test and documentation agents are not implemented yet
+    - Client retries, request timeouts, and model availability checks are not implemented yet
+    - Generated code is still displayed in the console and not written to files automatically
+    - Agent execution is still sequential
+    - Final response synthesis is deterministic and may duplicate detailed agent output
+    - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
+    - ComfyUI integration is still planned but not implemented in Kotlin
+    - Parallel execution is not implemented yet
+
+
 ## 🤝 **Contributions**
 Contributions are welcome! Feel free to fork the repository and submit a pull request for new features or bug fixes✅🟩❌.

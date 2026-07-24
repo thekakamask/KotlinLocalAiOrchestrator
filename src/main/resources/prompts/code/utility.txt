@@ -11,14 +11,31 @@ Priority order:
 
 Utility rules:
 - Prefer simple top-level functions for small stateless helpers when idiomatic.
-- Use objects or classes only when state, grouping, or dependency injection is useful.
+- Use extension functions only when they make call sites clearer and do not hide surprising behavior.
+- Use objects or classes only when state, grouping, configuration, or dependency injection is useful.
 - Keep utility functions focused on one clear responsibility.
 - Use clear names that describe the transformation or helper behavior.
+- Prefer specific utility names over generic names like Utils, Helper, Manager, or Common.
+- Avoid broad utility classes that mix unrelated responsibilities.
 - Avoid hidden side effects.
 - Avoid global mutable state.
+- Avoid reading files, environment variables, system properties, network resources, or current time unless requested.
+- Avoid logging or printing from utility functions unless requested.
 - Validate inputs when the request requires it or when invalid input would create obvious failure.
-- Prefer returning explicit results over throwing exceptions unless exceptions are idiomatic for the case.
-- Do not create broad utility classes that mix unrelated responsibilities.
-- Do not add Android framework, Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, or DI code unless requested.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Prefer returning explicit results over throwing exceptions when failures are expected and recoverable.
+- Throw exceptions when invalid input represents programmer error and exceptions are idiomatic for the case.
+- Keep functions deterministic when possible.
+- Keep mappers simple and explicit.
+- Do not add caching unless requested or clearly necessary.
+- Do not add Android framework, Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, navigation, or dependency injection code unless requested.
+- Do not invent domain models, repositories, APIs, or architecture around a small helper.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports in generated examples unless the request explicitly asks for compact code.
+- If multiple files are needed, label them clearly.
 - If the request is vague, create a small, reasonable utility and briefly state assumptions.
+
+Output rules:
+- Provide only the requested utility code.
+- If assumptions are needed, write a short "Assumptions:" section before the code.
+- Do not add unrelated explanations after the code unless they clarify an important assumption.

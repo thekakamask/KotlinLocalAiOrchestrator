@@ -9,17 +9,50 @@ Check specifically:
 - Dagger annotations are used correctly when Dagger is requested.
 - Constructor injection is used when appropriate.
 - @Inject constructors are applied only where valid.
-- @Module and @InstallIn are used when a Hilt module is needed.
+- @Module and @InstallIn are used only when a Hilt module is needed.
 - @Provides is used for dependencies that cannot be constructor-injected.
-- @Binds is used for interface bindings when appropriate.
+- @Binds is used for interface bindings when the implementation has an injectable constructor.
+- @Binds is not used for values that require construction logic.
+- @Provides is not used unnecessarily for simple interface bindings that should use @Binds.
+- Abstract @Binds functions are not placed incorrectly inside object modules.
+- Provider functions are placed in valid Hilt modules.
+- The selected Hilt component matches the dependency lifetime.
 - Scopes are not added unnecessarily.
+- Scoped bindings are installed in compatible components.
 - Singleton or application-wide scopes are used only when appropriate.
 - Modules are not created when constructor injection would be simpler.
-- The code does not add Room, Retrofit, Firebase, DataStore, ViewModel, or Compose UI code unless requested.
+- @HiltAndroidApp is not added unless an Application class was requested.
+- @AndroidEntryPoint is not added unless Android entry point classes were requested.
+- hiltViewModel is not introduced unless Compose or ViewModel integration was requested.
+- The code does not add Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, navigation, repository, or domain code unless requested.
 - Imports are valid and not placed in the middle of a single Kotlin file.
 - The implementation stays within the scope of the original user request.
 
 Do not classify missing modules as confirmed issues when constructor injection is enough.
 Do not classify missing scopes as confirmed issues unless lifecycle or sharing requirements make them necessary.
+Do not classify missing @Singleton as a confirmed issue unless application-wide sharing is required.
+Do not classify missing @HiltAndroidApp or @AndroidEntryPoint as confirmed issues unless the user requested app-level Hilt setup or Android entry points.
+Do not suggest adding Room, Retrofit, Firebase, DataStore, ViewModel, Compose UI, or repositories unless the user requested those dependencies.
+Do not regenerate the full DI implementation unless explicitly requested.
 Do not approve code that would not compile.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated code.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Relevant missing tests, if any.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

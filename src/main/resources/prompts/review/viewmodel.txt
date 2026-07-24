@@ -6,21 +6,57 @@ Check specifically:
 - The code would compile as Kotlin.
 - AndroidX ViewModel patterns are used correctly.
 - Hilt annotations are only used when Hilt is requested or clearly part of the project context.
+- @HiltViewModel is only used when Hilt integration is requested or clearly implied.
 - Public UI state is immutable.
 - MutableStateFlow is kept private.
 - StateFlow is exposed publicly.
+- MutableStateFlow is exposed with asStateFlow() when appropriate.
 - viewModelScope is used for ViewModel coroutine work.
+- runBlocking is not used inside the ViewModel.
+- Flow collection is lifecycle-conscious from the ViewModel side and does not create unnecessary long-running work.
+- Flow catch blocks do not swallow CancellationException.
 - Loading, success, and error states are represented when async data loading is requested.
 - UI state is modeled clearly.
+- State updates are explicit and readable.
 - One-shot events are not mixed into persistent UI state when that distinction is relevant.
+- Channel, SharedFlow, or event wrappers are used only when one-shot events are requested or clearly needed.
 - Mutable collections are not exposed directly.
 - Compose UI code is not placed inside the ViewModel.
+- Android Views, Activity, Fragment, composables, or unsafe Context references are not accessed from the ViewModel unless explicitly requested and lifecycle-safe.
 - Data access is delegated to repositories or use cases when architecture is implied.
-- The code does not add Repository, DI, Compose UI, Room, Firebase, Retrofit, or DataStore code unless requested.
+- Direct Room, Firebase, Retrofit, or DataStore access is not introduced unless the user requested a minimal example or no architecture layer is implied.
+- The code does not add Repository, use case, DI, Compose UI, Room, Firebase, Retrofit, DataStore, navigation, or UI code unless requested.
 - Imports are valid and not placed in the middle of a single Kotlin file.
 - The implementation stays within the scope of the original user request.
 
 Do not classify missing Hilt annotations as a confirmed issue unless Hilt was requested or clearly required by context.
 Do not classify missing repository/use case layers as confirmed issues for a small minimal example.
+Do not classify missing loading/error state as a confirmed issue unless async loading or failure handling was requested or clearly implied.
+Do not classify missing one-shot event handling as a confirmed issue unless one-shot events are requested or clearly needed.
+Do not classify use of StateFlow instead of LiveData as an issue unless LiveData was requested.
+Do not classify missing Compose integration as a confirmed issue unless Compose integration was requested.
+Do not classify missing dependency injection as a confirmed issue unless DI was requested.
+Do not suggest adding Channel, SharedFlow, event wrappers, repositories, use cases, or DI unless the request requires them.
+Do not regenerate the full ViewModel implementation unless explicitly requested.
 Do not approve code that would not compile.
 Distinguish confirmed issues from optional improvements.
+
+Your response must use exactly this structure:
+
+Summary:
+Short overall assessment.
+
+Confirmed issues:
+Only real issues directly supported by the generated code.
+
+Optional improvements:
+Non-blocking improvements.
+
+Speculative risks:
+Risks that depend on missing context.
+
+Missing tests:
+Relevant missing tests, if any.
+
+Final recommendation:
+Approve, approve with optional improvements, or request changes.

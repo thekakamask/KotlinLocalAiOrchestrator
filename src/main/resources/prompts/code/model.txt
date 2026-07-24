@@ -15,9 +15,26 @@ Model rules:
 - Use clear property names that match the requested domain.
 - Include only fields explicitly requested or fields that are clearly necessary for a useful minimal model.
 - For vague entity or model requests, choose a small reasonable model and briefly state assumptions.
+- Prefer non-nullable properties by default.
+- Use nullable properties only when null is explicitly required or clearly justified by the domain.
+- Do not add validation logic unless requested or clearly necessary to prevent an unusable object.
+- Do not add computed properties, helper methods, business rules, formatting logic, or lifecycle behavior unless requested.
 - Do not add persistence annotations such as Room or Firebase annotations unless requested.
 - Do not add serialization annotations unless requested.
-- Do not add validation logic unless requested or clearly necessary.
-- Do not add repositories, DAOs, ViewModels, UI, networking, dependency injection, or database code unless requested.
+- Do not add Android framework types unless requested.
+- Do not add repositories, DAOs, ViewModels, UI, networking, dependency injection, database code, or file I/O unless requested.
 - Avoid Java-style getters and setters when generating idiomatic Kotlin.
-- Keep imports valid for Kotlin. Do not place imports in the middle of a single Kotlin file.
+- Do not manually implement equals, hashCode, toString, componentN, or copy for data classes.
+- Use precise types when obvious and useful.
+- Avoid importing date, time, money, UUID, or serialization types unless they are requested or clearly needed.
+- If using LocalDate, LocalDateTime, BigDecimal, UUID, or another imported type, include the correct import.
+- For monetary values, prefer a precise representation such as BigDecimal, cents as Long, or a domain-specific amount type when the request requires correctness.
+- Do not use Double for money unless the request is simple, illustrative, or explicitly accepts it.
+- Keep imports valid for Kotlin.
+- Do not place imports in the middle of a single Kotlin file.
+- Do not use wildcard imports unless the request explicitly asks for compact code.
+
+Output rules:
+- Provide only the requested model code.
+- If assumptions are needed, write a short "Assumptions:" section before the code.
+- Do not add unrelated explanations after the code unless they clarify an important assumption.
