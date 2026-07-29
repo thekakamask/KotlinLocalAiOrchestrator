@@ -87,11 +87,11 @@ This means the active model names are no longer primarily hardcoded inside the a
 
 Current properties:
 
-`app.name`= KotlinAiOrchestrator
-`ollama.baseUrl`= `http://localhost:11434`
-`ollama.models.planning`= qwen3:8b
-`ollama.models.code`= qwen2.5-coder:14b
-`ollama.models.review`= deepseek-coder-v2:16b
+`app.name`=KotlinAiOrchestrator
+`ollama.baseUrl`=http://localhost:11434
+`ollama.models.planning`=qwen3:8b
+`ollama.models.code`=qwen2.5-coder:14b
+`ollama.models.review`=deepseek-coder-v2:16b
 
 Current meaning:
 

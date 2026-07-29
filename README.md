@@ -4,14 +4,15 @@
 
 The goal of this project is to coordinate specialized local AI models through a controllable orchestration workflow in order to automate and accelerate software development workflows such as code generation, code review, testing, documentation, architecture assistance, and future media generation.
 
-The current Kotlin implementation is centered around a planning-based workflow. A local planning model analyzes the user request and selects the appropriate workflow. A deterministic Kotlin `WorkflowPlanner` then resolves that workflow into an ordered agent pipeline, such as code generation only, code generation with review, or future code generation with tests and documentation.
+The current Kotlin implementation is centered around an explicit workflow orchestration model. A workflow type can be selected explicitly, preparing the project for a future UI where the user chooses between code generation, code generation with review, review-only, and future test or documentation workflows. When no explicit workflow type is provided, a local planning model can still analyze the user request as a fallback. A deterministic Kotlin `WorkflowPlanner` then resolves the selected workflow into an ordered agent pipeline.
 
 The current active text-based workflow uses:
 
-   - 🧭 **Planning Agent** → analyzes the user instruction and selects the workflow type, complexity, and reason
+   - 🧭 **Planning Agent** → fallback planner used when no explicit workflow type is provided
    - 🧩 **WorkflowPlanner** → deterministically maps the selected workflow to the agents that should run
    - 💻 **Code Agent** → generates implementation-ready code
    - 🔍 **Review Agent** → reviews generated code, identifies confirmed issues, optional improvements, risks, and missing tests
+   - 🎛️ **Explicit Workflow Type** → allows the workflow to be selected directly, preparing future UI button-based orchestration
 
 Future extensions are planned for:
 
@@ -41,21 +42,29 @@ The entire ecosystem is designed to run locally and offline.
 
 ## ✅ **LAST MAJOR UPDATES (see [UPDATES.md](./UPDATES.md) for details)**
 
-   - Hardened planning, code, and review prompts with stronger guardrails against scope expansion, invalid review advice, and unnecessary architecture
-   - Centralized prompt domain detection in `AiOrchestrator` and stored the selected domain in `ExecutionContext`
-   - Added runtime configuration loading with `ApplicationConfig` and `ApplicationConfigLoader`
-   - Loaded Ollama base URL and planning/code/review model names from `application.properties`
-   - Updated `OllamaClient` to use a configurable base URL
-   - Injected configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`
-   - Added centralized orchestration logging with `OrchestrationLogger` and `ConsoleOrchestrationLogger`
-   - Removed legacy `ManagerAgent`, `TaskType`, and `TaskClassifier`
-   - Updated tests to use explicit model injection, centralized prompt domain context, and fake orchestration logging
+   - Added optional explicit workflow selection through `OrchestrationTask.requestedWorkflowType`
+   - Updated `AiOrchestrator` to use explicit workflow types before falling back to `PlanningAgent`
+   - Updated `WorkflowPlanner` to create workflow plans from explicit workflow type and prompt domain
+   - Moved workflow-type selection toward a future UI/API button-based model
+   - Removed `FastPathWorkflowPlanner` and keyword-based workflow-type inference from the active architecture
+   - Removed `ExecutionMode` and the temporary `FAST` / `AUTO` / `SAFE` execution-mode experiment
+   - Centralized prompt-domain keywords into dedicated keyword definitions
+   - Kept `PlanningAgent` as a fallback only when no explicit workflow type is provided
+   - Clarified that prompt-domain detection remains automatic and centralized through `PromptSelector`
 
 
 ## ❌ **NEXT UPDATES**
 
-   - Add a deterministic fast-path planner for obvious workflow decisions
-   - Reduce planning latency for simple requests
+   - Add stricter Kotlin-side output contracts for generated artifacts
+   - Add an `ArtifactExtractor` to extract generated code blocks, artifact type, and possible file metadata from model responses
+   - Add an `ArtifactValidator` to catch obvious invalid outputs before review
+   - Validate expected artifact shape by prompt domain, such as model data classes, Room entities/DAOs/databases, Retrofit services/DTOs, test files, and documentation Markdown
+   - Prevent `ReviewAgent` from running when `CodeAgent` did not produce reviewable code
+   - Add a `ReviewResultParser` to extract confirmed issues, optional improvements, speculative risks, missing tests, and final recommendation
+   - Add a correction loop between `ReviewAgent` and `CodeAgent` when confirmed issues or request-changes recommendations are detected
+   - Add minimal project context detection, including Kotlin/Android target, available dependencies, package conventions, and project style
+   - Build the actual UI/API layer for selecting workflow types
+   - Rework planning toward domain fallback instead of workflow selection
    - Validate specialized prompts across more real-world requests
    - Improve Room prompt accuracy for complex entity relationships
    - Add a future `TestAgent`
@@ -72,7 +81,8 @@ The entire ecosystem is designed to run locally and offline.
 
    - 🧠 **AI orchestration pipeline**
       - 🟩 **IN PROGRESS** Multi-agent collaborative architecture
-      - 🟩 **IN PROGRESS** Planning-based workflow selection
+      - 🟩 **IN PROGRESS** Explicit workflow selection with planning fallback
+      - 🟩 **IN PROGRESS** UI-ready workflow type selection model
       - 🟩 **IN PROGRESS** Deterministic workflow-to-agent routing
       - 🟩 **IN PROGRESS** Intelligent task routing
       - ❌ **PLANNED** Parallel execution
@@ -83,7 +93,7 @@ The entire ecosystem is designed to run locally and offline.
       - 🟩 **IN PROGRESS** Centralized orchestration logging
 
    - 🧩 **Specialized agent responsibilities**
-      - 🟩 **IN PROGRESS** Planning agent workflow selection
+      - 🟩 **IN PROGRESS** Planning agent fallback behavior
       - 🟩 **IN PROGRESS** Workflow planner pipeline resolution
       - 🟩 **IN PROGRESS** Coding agent
       - 🟩 **IN PROGRESS** Review agent
@@ -151,8 +161,8 @@ The entire ecosystem is designed to run locally and offline.
    - **org.dcac** - application entry point and local execution demo
    - **org.dcac.agents** - agent contracts and specialized agents, including planning, code, and review agents
    - **org.dcac.client** - LLM abstraction, structured LLM responses, Ollama HTTP client, LLM-specific exception handling, and JSON request/response DTOs
-   - **org.dcac.models** - shared models used across orchestration, including tasks, results, workflow plans, workflow types, and complexity levels
-   - **org.dcac.workflow** - deterministic workflow planning components
+   - **org.dcac.models** - shared models used across orchestration, including tasks with optional explicit workflow selection, results, workflow plans, workflow types, and complexity levels
+   - **org.dcac.workflow** - deterministic workflow completion components that map selected workflow types to agent pipelines and task complexity
    - **org.dcac.tasks** - task validation and agent routing components
    - **org.dcac.orchestrator** - central orchestration workflow coordinating validation, planning, workflow completion, routing, chained execution, context sharing, result aggregation, and validation error propagation
    - **org.dcac.synthesis** - final response synthesis components used to build user-facing orchestration output
@@ -174,19 +184,22 @@ The entire ecosystem is designed to run locally and offline.
    - `App.kt` injects configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`
    - `AiOrchestrator` validates the task with `TaskValidator`
    - If validation fails, `AiOrchestrator` returns an unsuccessful `OrchestrationResult` with validation errors and no agent execution
-   - `PlanningAgent` sends the user instruction to the local planning model through `OllamaClient`
-   - `PlanningAgent` returns a structured workflow decision containing workflow type, complexity, and reason
-   - `WorkflowPlanner` completes the workflow plan by resolving the selected workflow into ordered agent identifiers
+   - `AiOrchestrator` detects the prompt domain once with `PromptSelector`
+   - The selected prompt domain is stored in `ExecutionContext`
+   - `OrchestrationTask` may contain an explicit `requestedWorkflowType`
+   - If `requestedWorkflowType` is provided, `AiOrchestrator` uses it directly without calling `PlanningAgent`
+   - If no explicit workflow type is provided, `PlanningAgent` sends the user instruction to the local planning model through `OllamaClient`
+   - `PlanningAgent` returns a fallback structured workflow decision containing workflow type, complexity, and reason
+   - `WorkflowPlanner` creates or completes the workflow plan by resolving the workflow type into ordered agent identifiers
+   - `WorkflowPlanner` can also estimate task complexity from the selected workflow type and prompt domain for explicit workflows
    - `TaskRouter` selects the concrete agent instances from the planned agent identifiers
    - `AiOrchestrator` logs the selected workflow, complexity, planning reason, selected agents, and execution timings
    - Selected agents are executed sequentially
-   - `AiOrchestrator` detects the prompt domain once with `PromptSelector`
-   - The selected prompt domain is stored in `ExecutionContext`
    - `CodeAgent` and `ReviewAgent` use the prompt domain from `ExecutionContext`
    - `PromptSelector` resolves the correct domain-specific prompt path
    - `PromptLoader` loads the selected prompt for the current agent execution
-   - `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`
    - `CodeAgent` generates implementation-ready code through the local code model
+   - `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`
    - `ReviewAgent`, when selected, reviews the generated code using previous agent output from the execution context
    - `OllamaClient` serializes requests and deserializes responses with Kotlinx Serialization
    - `OllamaClient` converts client failures into `LlmClientException`
@@ -203,12 +216,13 @@ The entire ecosystem is designed to run locally and offline.
 
 ## ⚠️ **Current Limitations**
 
-The project currently contains a working local planning-based orchestration pipeline.
+The project currently contains a working explicit workflow orchestration pipeline with planning fallback.
 
-   - Planning is currently performed by a local LLM and can be slow for simple requests
-   - A deterministic fast-path planner for obvious workflows is not implemented yet
+   - Planning is still performed by a local LLM when no explicit workflow type is provided and can be slow in fallback cases
+   - Workflow type selection is currently simulated in `App.kt`, but the future UI/API selection layer is not implemented yet
+   - Planning still selects workflow type in fallback mode, but future planning may be reworked toward prompt-domain or request-analysis fallback
    - Prompt domain detection is centralized in the orchestration context, but it is still keyword-based
-   - Test and documentation workflow types exist as planning targets, but dedicated agents are not implemented yet
+   - Test and documentation workflow types exist as selectable workflow types, but dedicated agents are not implemented yet
    - Final response synthesis is implemented, but it is deterministic and may duplicate detailed agent content
    - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
    - Generated code is displayed in the console but not written to files yet

@@ -6,26 +6,30 @@ This document describes the current architecture of KotlinLocalAiOrchestrator, t
 ## 1. High-Level Architecture
 
 KotlinLocalAiOrchestrator currently provides a modular, fully local orchestration pipeline connected to Ollama.
-The current architecture uses a planning-based workflow selection system.
+The current architecture uses an explicit workflow orchestration model with planning fallback.
+A workflow type can be provided directly through `OrchestrationTask.requestedWorkflowType`.
+When no explicit workflow type is provided, `PlanningAgent` can still select a workflow as a fallback.
 
 The architecture follows this execution flow:
 1. A user request is represented by an `OrchestrationTask`.
 2. Agent system prompts are loaded from `src/main/resources/prompts`.
 3. The task is validated by `TaskValidator`.
-4. `PlanningAgent` analyzes the user instruction and selects a workflow type, complexity level, and planning reason.
-5. `WorkflowPlanner` completes the planning decision by resolving the selected workflow into ordered agent identifiers.
-6. `TaskRouter` maps planned agent identifiers to concrete agent instances.
-7. `AiOrchestrator` coordinates the complete execution workflow.
-8. Selected agents from `agents` process the task sequentially.
-9. `CodeAgent`, when selected, generates implementation output.
-10. `ReviewAgent`, when selected, reviews the generated output.
-11. Text-based agents use `LlmClient` to communicate with Ollama.
-12. `OllamaClient` serializes requests, sends them to local models, and converts client failures into `LlmClientException`.
-13. Each agent returns an enriched `AgentResult`, including success or failure metadata.
-14. The orchestrator aggregates all results and validation errors into an `OrchestrationResult`.
-15. `ResponseSynthesizer` builds a final user-facing response from the agent results.
-16. The final response is stored in `OrchestrationResult.finalResponse`.
-17. The application displays the final response first, then separated developer details.
+4. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
+5. If `OrchestrationTask.requestedWorkflowType` is provided, `AiOrchestrator` uses it directly.
+6. If no explicit workflow type is provided, `PlanningAgent` analyzes the instruction as a fallback.
+7. `WorkflowPlanner` creates or completes the workflow plan by resolving the selected workflow into ordered agent identifiers and estimating complexity when needed.
+8. `TaskRouter` maps planned agent identifiers to concrete agent instances.
+9. `AiOrchestrator` coordinates the complete execution workflow.
+10. Selected agents from `agents` process the task sequentially.
+11. `CodeAgent`, when selected, generates implementation output.
+12. `ReviewAgent`, when selected, reviews the generated output.
+13. Text-based agents use `LlmClient` to communicate with Ollama.
+14. `OllamaClient` serializes requests, sends them to local models, and converts client failures into `LlmClientException`.
+15. Each agent returns an enriched `AgentResult`, including success or failure metadata.
+16. The orchestrator aggregates all results and validation errors into an `OrchestrationResult`.
+17. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+18. The final response is stored in `OrchestrationResult.finalResponse`.
+19. The application displays the final response first, then separated developer details.
 
 The current workflow runs entirely on the local machine.
 
@@ -47,7 +51,7 @@ The current runtime entry point is:
 - `TaskValidator`
 - `ResponseSynthesizer`
 - `AiOrchestrator`
-- sample `OrchestrationTask` values
+- sample `OrchestrationTask` values with optional explicit `requestedWorkflowType`
 - an `ExecutionContext`
 
 The current execution flow is:
@@ -64,18 +68,19 @@ The current execution flow is:
 11. Both objects are passed to `AiOrchestrator.execute()`.
 12. `TaskValidator` validates the task.
 13. If validation fails, `AiOrchestrator` returns an unsuccessful `OrchestrationResult` with validation errors and no agent execution.
-14. `PlanningAgent` analyzes the user instruction and returns a structured workflow decision.
-15. `WorkflowPlanner` completes the workflow plan by resolving it into ordered agent identifiers.
-16. `TaskRouter` selects concrete agents from the planned agent identifiers.
-17. Selected agents execute sequentially.
-18. `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`.
-19. Each model response is returned through `LlmResponse`.
-20. If an agent fails, it returns an `AgentResult` with `success = false` and `errorMessage`.
-21. Each agent wraps its response into an enriched `AgentResult`.
-22. `AiOrchestrator` aggregates the results and errors into an `OrchestrationResult`.
-23. `ResponseSynthesizer` builds a final user-facing response from the agent results.
-24. `OrchestrationResult.finalResponse` stores the synthesized response.
-25. `App.kt` displays the final response first, then separated agent responses with metadata.
+14. If the task contains `requestedWorkflowType`, `AiOrchestrator` uses it directly without calling `PlanningAgent`.
+15. If no explicit workflow type is provided, `PlanningAgent` analyzes the instruction and returns a fallback workflow decision.
+16. `WorkflowPlanner` creates or completes the workflow plan by resolving it into ordered agent identifiers and estimating complexity when appropriate.
+17. `TaskRouter` selects concrete agents from the planned agent identifiers.
+18. Selected agents execute sequentially.
+19. `AiOrchestrator` stores each agent output in `ExecutionContext.agentOutputs`.
+20. Each model response is returned through `LlmResponse`.
+21. If an agent fails, it returns an `AgentResult` with `success = false` and `errorMessage`.
+22. Each agent wraps its response into an enriched `AgentResult`.
+23. `AiOrchestrator` aggregates the results and errors into an `OrchestrationResult`.
+24. `ResponseSynthesizer` builds a final user-facing response from the agent results.
+25. `OrchestrationResult.finalResponse` stores the synthesized response.
+26. `App.kt` displays the final response first, then separated agent responses with metadata.
 
 For a simple code workflow, the usual execution order is:
 1. `PlanningAgent` using the planning model
@@ -137,12 +142,12 @@ Current models:
 
 ### `org.dcac.workflow`
 
-Contains deterministic workflow planning components.
+Contains deterministic workflow completion components.
 
 Current components:
 - `WorkflowPlanner`
 
-This package converts a workflow decision into an ordered list of agent identifiers.
+This package creates or completes workflow plans by mapping selected workflow types to ordered agent identifiers and estimating task complexity from workflow type and prompt domain.
 
 
 ### `org.dcac.tasks`
@@ -159,7 +164,7 @@ Validation and planned-agent routing are connected to the current workflow.
 ### `org.dcac.orchestrator`
 
 Contains the central application coordination service.
-`AiOrchestrator` validates tasks, asks the planning agent for a workflow decision, completes the workflow plan, routes planned agents, executes selected agents, evaluates global success, and builds the final result.
+`AiOrchestrator` validates tasks, detects the prompt domain, uses an explicit workflow type when provided, falls back to `PlanningAgent` when needed, completes the workflow plan, routes planned agents, executes selected agents, evaluates global success, and builds the final result.
 
 
 ### `org.dcac.prompts`
@@ -490,7 +495,8 @@ Current properties:
 - `agentIds`
 - `reason`
 
-`agentIds` is completed by `WorkflowPlanner` after the planning model selects a workflow.
+`agentIds` is filled by `WorkflowPlanner`.
+The workflow may come from an explicit `requestedWorkflowType` or from planning fallback.
 
 
 ### `src/main/kotlin/org/dcac/models/OrchestrationTask.kt`
@@ -501,8 +507,11 @@ Current properties:
 - `id`
 - `title`
 - `instruction`
+- `requestedWorkflowType`
 
-The task no longer needs to manually carry a task type for the active planning-based workflow.
+`requestedWorkflowType` is optional.
+When it is provided, the orchestrator uses it directly and skips planning.
+When it is absent, planning fallback can still select the workflow.
 
 
 ### `src/main/kotlin/org/dcac/models/ExecutionContext.kt`
@@ -565,13 +574,17 @@ This allows workflow selection to be handled by `PlanningAgent` and `WorkflowPla
 
 ### `src/main/kotlin/org/dcac/workflow/WorkflowPlanner.kt`
 
-Completes a `WorkflowPlan` produced by the planning step.
+Creates or completes a `WorkflowPlan` from a selected workflow type.
+The selected workflow can come from `OrchestrationTask.requestedWorkflowType` or from `PlanningAgent` fallback.
 
 Current responsibilities:
 - receive a workflow decision from `PlanningAgent`
 - map `WorkflowType` to ordered agent identifiers
 - return a completed `WorkflowPlan`
 - keep agent execution routing deterministic and testable
+- create a workflow plan from an explicit `WorkflowType` and `PromptDomain`
+- estimate `TaskComplexity` for explicit workflows
+- complete fallback plans returned by `PlanningAgent`
 
 Example mappings:
 - `CODE_ONLY` → `code`
@@ -591,8 +604,10 @@ Current responsibilities:
 - validate the incoming task
 - stop invalid task execution
 - include validation errors in `OrchestrationResult.errors`
-- ask `PlanningAgent` to select a workflow
-- ask `WorkflowPlanner` to complete the workflow plan
+- detect the prompt domain once with `PromptSelector`
+- use `OrchestrationTask.requestedWorkflowType` directly when provided
+- call `PlanningAgent` only when no explicit workflow type is provided
+- ask `WorkflowPlanner` to create or complete the workflow plan
 - route planned agent identifiers through `TaskRouter`
 - execute selected agents sequentially
 - maintain a progressively enriched `ExecutionContext`
@@ -748,7 +763,7 @@ Current prompt domains include:
 
 ## Tests
 
-### `src/test/kotlin/org/dcac/fakes/FakeTasks.kt`
+### `src/test/kotlin/org/dcac/fakeData/FakeTasks.kt`
 
 Provides reusable fake orchestration tasks for unit tests.
 
@@ -759,7 +774,7 @@ Current purpose:
 - create invalid tasks with both title and instruction blank
 
 
-### `src/test/kotlin/org/dcac/fakes/FakeLlmClient.kt`
+### `src/test/kotlin/org/dcac/fakeData/FakeLlmClient.kt`
 
 Provides a fake `LlmClient` implementation for agent tests.
 
@@ -769,7 +784,7 @@ Current purpose:
 - test agents without calling real Ollama models
 
 
-### `src/test/kotlin/org/dcac/fakes/FakeAgent.kt`
+### `src/test/kotlin/org/dcac/fakeData/FakeAgent.kt`
 
 Provides a fake `Agent` implementation for orchestrator tests.
 
@@ -780,7 +795,7 @@ Current purpose:
 - inspect the `ExecutionContext` received by downstream agents
 
 
-### `src/test/kotlin/org/dcac/fakes/FakeOrchestrationLogger.kt`
+### `src/test/kotlin/org/dcac/fakeData/FakeOrchestrationLogger.kt`
 
 Provides a fake `OrchestrationLogger` implementation for tests.
 
@@ -862,6 +877,8 @@ Current coverage:
 - `CODE_REVIEW` maps to `code`, `review`
 - `CODE_REVIEW_DOCUMENTATION` currently maps to `code`, `review`
 - `REVIEW_ONLY` maps to `review`
+- creates workflow plans from explicit workflow type and prompt domain
+- estimates complexity for explicit workflows
 
 
 ### `src/test/kotlin/org/dcac/tasks/TaskRouterTest.kt`
@@ -881,11 +898,11 @@ Tests central orchestration behavior.
 Current coverage:
 - invalid tasks return validation errors
 - invalid tasks do not call planning or agents
-- planning selects `CODE_REVIEW` and runs code then review
-- planning selects `CODE_ONLY` and runs only code
+- explicit workflow types bypass `PlanningAgent`
+- tasks without `requestedWorkflowType` still use planning fallback
+- selected workflows run the expected agents
 - failed selected agents produce an unsuccessful `OrchestrationResult`
 - code output is made available to the review agent
-- planning fallback still runs the default code-review workflow
 
 
 ## 5. Current Status
@@ -943,11 +960,16 @@ Implemented:
 - removal of legacy `ManagerAgent`
 - removal of transitional `TaskType`
 - removal of transitional `TaskClassifier`
+- explicit workflow selection through `OrchestrationTask.requestedWorkflowType`
+- workflow plan creation from explicit workflow type and prompt domain
+- planning fallback when no explicit workflow type is provided
+- centralized prompt-domain keyword definitions
 
 
 Current limitations:
-- planning is currently performed by a local LLM and can be slow for simple requests
-- a deterministic fast-path planner for obvious workflows is not implemented yet
+- planning is still performed by a local LLM when no explicit workflow type is provided and can be slow in fallback cases
+- workflow type selection is currently simulated in `App.kt`; the future UI/API selection layer is not implemented yet
+- planning still selects workflow type in fallback mode, but future planning may be reworked toward prompt-domain or request-analysis fallback
 - prompt domain detection is centralized in `ExecutionContext`, but still keyword-based
 - specialized prompts still need more real-world validation across domains
 - test and documentation workflow types exist, but dedicated agents are not implemented yet
@@ -961,15 +983,21 @@ Current limitations:
 - final response synthesis is implemented, but it is currently deterministic and may duplicate detailed agent content
 
 Planned next:
-1. Add a deterministic fast-path planner for obvious workflow decisions.
-2. Reduce planning latency for simple requests.
-3. Validate specialized prompts across more real-world requests.
-4. Improve Room prompt accuracy for complex entity relationships.
-5. Add a future `TestAgent`.
-6. Add a future `DocumentationAgent`.
-7. Improve final response formatting and reduce duplicated agent content.
-8. Add generated file support.
-9. Add retry, timeout, and fallback strategies.
-10. Check model availability before generation.
-11. Add ComfyUI integration.
-12. Add asynchronous or parallel execution where appropriate.
+1. Build the actual UI/API layer for selecting workflow types.
+2. Rework planning toward domain fallback instead of workflow selection.
+3. Add Kotlin-side output contracts for generated artifacts.
+4. Add `ArtifactExtractor` and `ArtifactValidator`.
+5. Prevent `ReviewAgent` from reviewing non-code outputs.
+6. Add `ReviewResultParser`.
+7. Add a correction loop between `ReviewAgent` and `CodeAgent`.
+8. Add minimal project context detection.
+9. Validate specialized prompts across more real-world requests.
+10. Improve Room prompt accuracy for complex entity relationships.
+11. Add a future `TestAgent`.
+12. Add a future `DocumentationAgent`.
+13. Improve final response formatting and reduce duplicated agent content.
+14. Add generated file support.
+15. Add retry, timeout, and fallback strategies.
+16. Check model availability before generation.
+17. Add ComfyUI integration.
+18. Add asynchronous or parallel execution where appropriate.

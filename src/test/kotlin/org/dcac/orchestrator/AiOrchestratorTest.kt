@@ -6,6 +6,7 @@ import org.dcac.fakeData.FakeLlmClient
 import org.dcac.fakeData.FakeOrchestrationLogger
 import org.dcac.fakeData.FakeTasks
 import org.dcac.models.ExecutionContext
+import org.dcac.models.OrchestrationTask
 import org.dcac.prompts.PromptSelector
 import org.dcac.synthesis.ResponseSynthesizer
 import org.dcac.tasks.TaskRouter
@@ -58,6 +59,14 @@ class AiOrchestratorTest {
         )
     }
 
+    private fun ambiguousTask(): OrchestrationTask {
+        return OrchestrationTask(
+            id = "ambiguous-task",
+            title = "Improve module",
+            instruction = "Help me improve this module behavior."
+        )
+    }
+
     @Test
     fun execute_whenTaskIsInvalid_returnsValidationErrorsAndDoesNotRunPlanningOrAgents() {
         val planningClient = createPlanningClient()
@@ -87,15 +96,50 @@ class AiOrchestratorTest {
     }
 
     @Test
-    fun execute_whenPlanningSelectsCodeReview_runsCodeAndReviewAgents() {
+    fun execute_whenFastPathCanPlan_skipsPlanningModelAndRunsAgents() {
+        val planningClient = createPlanningClient()
+
         val codeAgent = FakeAgent(
             id = "code",
             output = "generated code"
         )
+
         val reviewAgent = FakeAgent(
             id = "review",
             output = "review result"
         )
+
+        val orchestrator = createOrchestrator(
+            planningClient = planningClient,
+            agents = listOf(codeAgent, reviewAgent)
+        )
+
+        val result = orchestrator.execute(
+            task = FakeTasks.validCodeTask(),
+            context = ExecutionContext(projectPath = ".")
+        )
+
+        assertTrue(result.success)
+        assertEquals(0, planningClient.generalCallCount)
+        assertEquals(2, result.results.size)
+        assertEquals("code", result.results[0].agentId)
+        assertEquals("review", result.results[1].agentId)
+        assertEquals(1, codeAgent.runCount)
+        assertEquals(1, reviewAgent.runCount)
+    }
+
+    @Test
+    fun execute_whenPlanningResultIsCodeReview_runsCodeAndReviewAgents() {
+        val codeAgent = FakeAgent(
+            id = "code",
+            output = "generated code"
+        )
+
+        val reviewAgent = FakeAgent(
+            id = "review",
+            output = "review result"
+        )
+
         val orchestrator = createOrchestrator(
             planningClient = createPlanningClient(
                 workflowType = "CODE_REVIEW",
@@ -105,7 +149,7 @@ class AiOrchestratorTest {
         )
 
         val result = orchestrator.execute(
-            task = FakeTasks.validCodeTask(),
+            task = ambiguousTask(),
             context = ExecutionContext(projectPath = ".")
         )
 
@@ -121,7 +165,7 @@ class AiOrchestratorTest {
     }
 
     @Test
-    fun execute_whenPlanningSelectsCodeOnly_runsOnlyCodeAgent() {
+    fun execute_whenPlanningResultIsCodeOnly_runsOnlyCodeAgent() {
         val codeAgent = FakeAgent(
             id = "code",
             output = "generated code"
@@ -141,7 +185,7 @@ class AiOrchestratorTest {
         )
 
         val result = orchestrator.execute(
-            task = FakeTasks.validCodeTask(),
+            task = ambiguousTask(),
             context = ExecutionContext(projectPath = ".")
         )
 
@@ -176,7 +220,7 @@ class AiOrchestratorTest {
         )
 
         val result = orchestrator.execute(
-            task = FakeTasks.validCodeTask(),
+            task = ambiguousTask(),
             context = ExecutionContext(projectPath = ".")
         )
 
@@ -214,7 +258,7 @@ class AiOrchestratorTest {
         )
 
         val result = orchestrator.execute(
-            task = FakeTasks.validCodeTask(),
+            task = ambiguousTask(),
             context = ExecutionContext(projectPath = ".")
         )
 
@@ -244,7 +288,7 @@ class AiOrchestratorTest {
         )
 
         val result = orchestrator.execute(
-            task = FakeTasks.validCodeTask(),
+            task = ambiguousTask(),
             context = ExecutionContext(projectPath = ".")
         )
 

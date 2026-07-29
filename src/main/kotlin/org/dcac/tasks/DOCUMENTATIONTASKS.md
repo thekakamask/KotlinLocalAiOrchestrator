@@ -11,7 +11,8 @@ Its current responsibilities are divided into two active operations:
 This package separates task validation and agent resolution rules from agent implementation and orchestration logic.
 
 At the current stage, validation and planned-agent routing are integrated into the main workflow.
-Workflow selection is handled by `PlanningAgent` and `WorkflowPlanner`.
+Workflow selection can be provided explicitly through `OrchestrationTask.requestedWorkflowType` or selected by `PlanningAgent` as a fallback.
+`WorkflowPlanner` then creates or completes the workflow plan.
 The previous `TaskClassifier` and `TaskType` workflow has been removed.
 
 
@@ -72,7 +73,7 @@ Its purpose is to keep concrete agent resolution independent from the central or
 
 ### `TaskValidator`
 
-`TaskValidator` verifies an `OrchestrationTask` before planning and execution begin.
+`TaskValidator` verifies an `OrchestrationTask` before workflow selection and execution begin.
 
 It currently performs two validations:
 - the task title must not be blank
@@ -82,7 +83,7 @@ The `validate()` function returns a list of error messages.
 If the list is empty, the task is considered valid.
 If the list contains errors, `AiOrchestrator` stops the workflow and returns an unsuccessful `OrchestrationResult` with the validation errors stored in `OrchestrationResult.errors`.
 
-No planning agent, executable agent, or Ollama model is called when validation fails.
+No planning fallback, executable agent, or Ollama model is called when validation fails.
 
 Current validation messages:
 - `title must not be blank`
@@ -110,19 +111,19 @@ The current task preparation and routing flow is:
 2. `AiOrchestrator` sends the task to `TaskValidator`.
 3. Invalid tasks stop before planning or agent execution.
 4. Validation messages are returned in `OrchestrationResult.errors`.
-5. Valid tasks are sent to `PlanningAgent`.
-6. `PlanningAgent` selects a workflow type, complexity level, and reason.
-7. `WorkflowPlanner` completes the workflow plan with ordered agent identifiers.
-8. `TaskRouter` resolves those identifiers into concrete registered agents.
-9. `AiOrchestrator` executes the selected agents sequentially in planned order.
-10. After each executable agent completes, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
-11. Downstream agents can use previous outputs if their implementation supports it.
-12. `ResponseSynthesizer` builds the final user-facing response.
+5. Valid tasks continue to workflow selection.
+6. If `OrchestrationTask.requestedWorkflowType` is provided, `AiOrchestrator` uses it directly.
+7. If no explicit workflow type is provided, `PlanningAgent` selects a fallback workflow type, complexity level, and reason.
+8. `WorkflowPlanner` creates or completes the workflow plan with ordered agent identifiers.
+9. `TaskRouter` resolves those identifiers into concrete registered agents.
+10. `AiOrchestrator` executes the selected agents sequentially in planned order.
+11. After each executable agent completes, `AiOrchestrator` stores the agent output in `ExecutionContext.agentOutputs`.
+12. Downstream agents can use previous outputs if their implementation supports it.
+13. `ResponseSynthesizer` builds the final user-facing response.
 
 Task validation behavior is covered by JVM unit tests in `TaskValidatorTest`.
 
 The intended future flow is:
-User instruction → validation → planning → workflow completion → planned agent routing → agent execution → final response synthesis
+User instruction → validation → explicit workflow selection or planning fallback → workflow completion → planned agent routing → agent execution → final response synthesis
 
-A possible future optimization is:
-User instruction → deterministic fast-path check → planning fallback when needed → workflow completion → planned agent routing → agent execution → final response synthesis
+A future UI or API layer may provide `requestedWorkflowType` directly through workflow-selection buttons.

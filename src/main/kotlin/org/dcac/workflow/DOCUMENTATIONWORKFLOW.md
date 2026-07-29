@@ -2,9 +2,9 @@
 
 ## 📌 Summary
 
-The `workflow` package contains deterministic workflow planning components.
-Its role is to complete the workflow decision produced by `PlanningAgent` and convert it into an ordered executable agent pipeline.
-The planning model selects the high-level workflow intent, while the Kotlin workflow layer keeps the final agent order deterministic, explicit, and testable.
+The `workflow` package contains deterministic workflow completion components.
+Its role is to create or complete workflow plans and convert selected workflow types into ordered executable agent pipelines.
+A workflow type can come from `OrchestrationTask.requestedWorkflowType` or from `PlanningAgent` fallback, while the Kotlin workflow layer keeps agent order and complexity estimation deterministic, explicit, and testable.
 
 Current component:
 - `WorkflowPlanner`
@@ -21,18 +21,24 @@ This package separates workflow-to-agent mapping from:
 
 ### `WorkflowPlanner`
 
-`WorkflowPlanner` completes a `WorkflowPlan` after the planning step.
+`WorkflowPlanner` creates or completes a `WorkflowPlan` from a selected workflow type.
 
-It receives a workflow decision containing:
+It can receive either:
+- an explicit `WorkflowType` and `PromptDomain`
+- or a fallback `WorkflowPlan` produced by `PlanningAgent`
+
+For explicit workflows, it creates a `WorkflowPlan` containing:
 - selected `WorkflowType`
 - estimated `TaskComplexity`
-- planning reason
-- usually an empty `agentIds` list before completion
+- ordered `agentIds`
+- selection reason
 
-It returns a completed `WorkflowPlan` with ordered agent identifiers.
+For fallback planning, it completes an existing `WorkflowPlan` by filling ordered `agentIds`.
 
 Current responsibilities:
-- receive the workflow decision produced by `PlanningAgent`
+- create workflow plans from explicit workflow type and prompt domain
+- complete fallback workflow decisions produced by `PlanningAgent`
+- estimate task complexity for explicit workflows
 - map `WorkflowType` values to ordered agent identifiers
 - preserve the selected workflow type
 - preserve the selected complexity level
@@ -52,7 +58,7 @@ For example:
 - `CODE_REVIEW_DOCUMENTATION` can currently resolve to `code`, `review`
 - `CODE_REVIEW_TEST_DOCUMENTATION` can currently resolve to `code`, `review`
 
-This allows the planning model to select future workflow categories before all dedicated agents are implemented.
+This allows explicit workflow selection or planning fallback to reference future workflow categories before all dedicated agents are implemented.
 
 Once future agents exist, these mappings can be expanded to include:
 - `test`
@@ -64,18 +70,18 @@ Once future agents exist, these mappings can be expanded to include:
 
 The current workflow planning flow is:
 1. `AiOrchestrator` validates the incoming `OrchestrationTask`.
-2. `PlanningAgent` analyzes the user instruction.
-3. `PlanningAgent` returns a `WorkflowPlan`-compatible decision.
-4. The initial plan contains the selected workflow type, complexity, and reason.
-5. `AiOrchestrator` sends that plan to `WorkflowPlanner`.
-6. `WorkflowPlanner` maps the selected `WorkflowType` to ordered agent identifiers.
-7. The completed `WorkflowPlan.agentIds` is returned to `AiOrchestrator`.
-8. `AiOrchestrator` sends the planned agent identifiers to `TaskRouter`.
-9. `TaskRouter` resolves identifiers into concrete registered agents.
-10. `AiOrchestrator` executes the selected agents sequentially.
+2. `AiOrchestrator` detects the prompt domain with `PromptSelector`.
+3. If `OrchestrationTask.requestedWorkflowType` is provided, `WorkflowPlanner` creates a plan from the explicit workflow type and prompt domain.
+4. If no explicit workflow type is provided, `PlanningAgent` returns a fallback `WorkflowPlan`-compatible decision.
+5. `WorkflowPlanner` completes fallback plans by filling ordered agent identifiers.
+6. The completed `WorkflowPlan.agentIds` is returned to `AiOrchestrator`.
+7. `AiOrchestrator` sends the planned agent identifiers to `TaskRouter`.
+8. `TaskRouter` resolves identifiers into concrete registered agents.
+9. `AiOrchestrator` executes the selected agents sequentially.
 
 Example full flow:
-`CODE_REVIEW` selected by `PlanningAgent`
+`CODE_REVIEW` selected explicitly through `OrchestrationTask.requestedWorkflowType`
+If no explicit workflow type is provided, `PlanningAgent` may select `CODE_REVIEW` as a fallback before `WorkflowPlanner` completes the plan.
 
 Then:
 1. `WorkflowPlanner` resolves `CODE_REVIEW` into `code`, `review`.
@@ -89,8 +95,8 @@ Then:
 
 ## ✅ Current Benefits
 
-- Keeps workflow execution deterministic after LLM planning.
-- Prevents the planning model from directly controlling concrete agent instances.
+- Keeps workflow execution deterministic after explicit selection or planning fallback.
+- Prevents both user-facing workflow selection and planning fallback from directly controlling concrete agent instances.
 - Keeps agent order centralized and easy to test.
 - Allows future workflow types to exist before all future agents are implemented.
 - Keeps `AiOrchestrator` focused on coordination instead of workflow mapping rules.
@@ -107,6 +113,8 @@ Current tested scenarios:
 - `CODE_REVIEW` resolves to `code`, `review`
 - `CODE_REVIEW_DOCUMENTATION` currently resolves to implemented executable agents
 - workflow type, complexity, and reason are preserved when the plan is completed
+- explicit workflow plan creation from workflow type and prompt domain
+- complexity estimation for explicit workflows
 
 Additional future tests may cover:
 - test-agent workflows when `TestAgent` exists
@@ -124,7 +132,7 @@ Additional future tests may cover:
 - Future workflow types may temporarily resolve to `code` and `review` only.
 - The planner does not yet distinguish required agents from optional agents.
 - The planner does not yet include dependency metadata between agents.
-- `WorkflowPlanner` does not use prompt domain information; prompt specialization is handled separately through `PromptSelector` and `ExecutionContext`.
+- `WorkflowPlanner` uses prompt domain only for deterministic complexity estimation; prompt specialization is still handled separately through `PromptSelector` and `ExecutionContext`.
 - The planner does not currently influence model selection.
 - The planner does not yet support parallel branches.
 
@@ -140,8 +148,8 @@ Additional future tests may cover:
 - optionally include prompt-domain diagnostics in workflow metadata
 - use complexity to influence workflow depth
 - use complexity to influence model selection
-- add deterministic fast-path workflow decisions before calling the planning model
 - support richer workflow metadata for diagnostics and final response synthesis
+- support richer explicit workflow metadata for future UI/API usage
 
 
 ## 🎯 Long-Term Purpose

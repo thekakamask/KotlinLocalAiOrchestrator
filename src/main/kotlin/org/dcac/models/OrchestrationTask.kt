@@ -12,6 +12,7 @@ data class OrchestrationTask(
     // Human-readable task title.
     val title: String,
     // Detailed instruction describing what the system should do.
-    val instruction: String
+    val instruction: String,
+    val requestedWorkflowType: WorkflowType?= null
 )
 

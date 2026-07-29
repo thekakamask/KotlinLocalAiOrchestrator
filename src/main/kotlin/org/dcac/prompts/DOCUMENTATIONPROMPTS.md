@@ -18,7 +18,8 @@ Current prompt files are stored under:
 - domain-specific review prompts under `src/main/resources/prompts/review/`
 
 The previous `manager.txt` prompt has been replaced in the active workflow by `planning.txt`.
-The active workflow now uses a planning prompt to select the workflow type, complexity, and reason before executable agents run.
+The active workflow can receive an explicit workflow type through `OrchestrationTask.requestedWorkflowType`.
+When no explicit workflow type is provided, `PlanningAgent` uses `planning.txt` as a fallback prompt to select workflow type, complexity, and reason.
 `AiOrchestrator` detects the prompt domain once with `PromptSelector` and stores it in `ExecutionContext`.
 `CodeAgent` and `ReviewAgent` then use that shared prompt domain to load the appropriate domain-specific prompt.
 
@@ -34,7 +35,7 @@ Current responsibility:
 
 Current usage:
 1. `App.kt` creates a `PromptLoader`.
-2. `PromptLoader` loads `prompts/planning.txt` for `PlanningAgent`.
+2. `PromptLoader` loads `prompts/planning.txt` for `PlanningAgent` fallback workflow selection.
 3. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
 4. The selected prompt domain is stored in `ExecutionContext`.
 5. `CodeAgent` receives `PromptLoader` and loads the code prompt matching `ExecutionContext.promptDomain`.
@@ -62,6 +63,7 @@ Current domains include:
 - `UTILITY`
 
 Its purpose is to separate technical prompt specialization from workflow selection.
+
 
 ## `PromptSelector`
 
@@ -118,6 +120,7 @@ Current review prompts:
 - `prompts/review/documentation.txt`
 - `prompts/review/utility.txt`
 
+
 ## Current Benefits
 
 - Agent behavior can be changed without modifying Kotlin agent classes.
@@ -131,6 +134,7 @@ Current review prompts:
 - Prompt domain detection is now performed once per orchestration workflow.
 - `CodeAgent` and `ReviewAgent` use the same selected prompt domain through `ExecutionContext`.
 
+
 ## Current Limitations
 
 - Prompt domain detection is centralized in `AiOrchestrator`, but it is still keyword-based.
@@ -139,7 +143,8 @@ Current review prompts:
 - Prompt versioning is not implemented.
 - Prompt configuration is not loaded from `application.properties`.
 - Some specialized review prompts still need stronger output-format enforcement.
-- Dedicated documentation-agent and test-agent prompt families are not implemented yet.
+- Dedicated `DocumentationAgent` and `TestAgent` prompt families are not implemented yet; current test and documentation prompts are still code/review prompt variants.
+
 
 ## Future Improvements
 
@@ -152,3 +157,4 @@ Current review prompts:
 - improve specialized review prompt output-format enforcement
 - add documentation-agent prompt families when `DocumentationAgent` is implemented
 - add test-agent prompt families when `TestAgent` is implemented
+- support prompt-domain fallback through a future request-analysis or domain-planning step

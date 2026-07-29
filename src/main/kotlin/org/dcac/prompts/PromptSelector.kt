@@ -12,152 +12,18 @@ class PromptSelector {
         val normalizedInstruction = instruction.lowercase()
 
         return when {
-            containsAny(
-                normalizedInstruction,
-                "room",
-                "sqlite",
-                "dao",
-                "room database",
-                "sqlite database",
-                "local database",
-                "base locale",
-                "base de données locale",
-                "persistance",
-                "persistance locale",
-                "persistence",
-                "local persistence",
-                "room relation",
-                "database relation",
-                "primary key",
-                "foreign key",
-                "clé primaire",
-                "clé étrangère",
-                "contentprovider",
-                "content provider"
-            ) -> PromptDomain.ROOM
-
-            containsAny(
-                normalizedInstruction,
-                "firebase",
-                "firestore",
-                "realtime database",
-                "firebase database",
-                "firebase collection",
-                "firestore collection",
-                "firebase document",
-                "firestore document",
-                "remote repository"
-            ) -> PromptDomain.FIREBASE
-
-            containsAny(
-                normalizedInstruction,
-                "retrofit",
-                "api service",
-                "rest api",
-                "http client",
-                "google map",
-                "google maps",
-                "endpoint"
-            ) -> PromptDomain.RETROFIT
-
-            containsAny(
-                normalizedInstruction,
-                "datastore",
-                "preferences",
-                "settings",
-                "paramètres",
-                "preference repository"
-            ) -> PromptDomain.DATASTORE
-
-            containsAny(
-                normalizedInstruction,
-                "sync",
-                "synchronization",
-                "synchro",
-                "synchronisation",
-                "synchronise",
-                "synchronize",
-                "worker",
-                "workmanager",
-                "upload",
-                "download",
-                "scheduler"
-            ) -> PromptDomain.SYNC
-
-            containsAny(
-                normalizedInstruction,
-                "hilt",
-                "dagger",
-                "dependency injection",
-                "injection de dépendances",
-                "module",
-                "provides",
-                "binds",
-                "inject"
-            ) -> PromptDomain.DEPENDENCY_INJECTION
-
-            containsAny(
-                normalizedInstruction,
-                "viewmodel",
-                "ui state",
-                "stateflow",
-                "viewmodelscope",
-                "lifecycle"
-            ) -> PromptDomain.VIEWMODEL
-
-            containsAny(
-                normalizedInstruction,
-                "compose",
-                "composable",
-                "material 3",
-                "material3",
-                "screen",
-                "écran",
-                "ui component",
-                "composant ui",
-                "layout"
-            ) -> PromptDomain.COMPOSE_UI
-
-            containsAny(
-                normalizedInstruction,
-                "test",
-                "unit test",
-                "integration test",
-                "fake",
-                "mock",
-                "assert"
-            ) -> PromptDomain.TEST
-
-            containsAny(
-                normalizedInstruction,
-                "documentation",
-                "readme",
-                "architecture doc",
-                "explain",
-                "technical notes"
-            ) -> PromptDomain.DOCUMENTATION
-
-            containsAny(
-                normalizedInstruction,
-                "data class",
-                "model",
-                "dto",
-                "value object",
-                "entity",
-                "entité",
-                "domain class",
-                "domain model"
-            ) -> PromptDomain.MODEL
-
-            containsAny(
-                normalizedInstruction,
-                "utils",
-                "utility",
-                "helper",
-                "network monitor",
-                "formatter"
-            ) -> PromptDomain.UTILITY
-
+            containsAny(normalizedInstruction, PromptDomainKeywords.room) -> PromptDomain.ROOM
+            containsAny(normalizedInstruction, PromptDomainKeywords.firebase) -> PromptDomain.FIREBASE
+            containsAny(normalizedInstruction, PromptDomainKeywords.retrofit) -> PromptDomain.RETROFIT
+            containsAny(normalizedInstruction, PromptDomainKeywords.datastore) -> PromptDomain.DATASTORE
+            containsAny(normalizedInstruction, PromptDomainKeywords.sync) -> PromptDomain.SYNC
+            containsAny(normalizedInstruction, PromptDomainKeywords.dependencyInjection) -> PromptDomain.DEPENDENCY_INJECTION
+            containsAny(normalizedInstruction, PromptDomainKeywords.viewModel) -> PromptDomain.VIEWMODEL
+            containsAny(normalizedInstruction, PromptDomainKeywords.composeUi) -> PromptDomain.COMPOSE_UI
+            containsAny(normalizedInstruction, PromptDomainKeywords.test) -> PromptDomain.TEST
+            containsAny(normalizedInstruction, PromptDomainKeywords.documentation) -> PromptDomain.DOCUMENTATION
+            containsAny(normalizedInstruction, PromptDomainKeywords.model) -> PromptDomain.MODEL
+            containsAny(normalizedInstruction, PromptDomainKeywords.utility) -> PromptDomain.UTILITY
             else -> PromptDomain.GENERAL
         }
     }
@@ -204,7 +70,7 @@ class PromptSelector {
         }
     }
 
-    private fun containsAny(text: String, vararg keywords: String): Boolean {
+    private fun containsAny(text: String, keywords: List<String>): Boolean {
         return keywords.any { keyword -> text.contains(keyword) }
     }
 

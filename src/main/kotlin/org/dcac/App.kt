@@ -8,6 +8,7 @@ import org.dcac.config.ApplicationConfigLoader
 import org.dcac.logging.ConsoleOrchestrationLogger
 import org.dcac.models.ExecutionContext
 import org.dcac.models.OrchestrationTask
+import org.dcac.models.WorkflowType
 import org.dcac.orchestrator.AiOrchestrator
 import org.dcac.prompts.PromptLoader
 import org.dcac.prompts.PromptSelector
@@ -86,25 +87,101 @@ fun main() {
         logger = logger
     )
 
-    // Create a sample task that represents a user request to generate Kotlin code.
-    val task = OrchestrationTask(
-        // Unique identifier for this task execution.
-        id = "task-001",
-        // Human-readable title describing the task.
-        title = "Create domain class",
-        // Detailed instruction that will be passed to the selected agents.
-        instruction = "Implement Kotlin code for a simple Order entity."
+    val demoTasks = listOf(
+        OrchestrationTask(
+            id = "task-001",
+            title = "Explicit CODE_REVIEW model",
+            instruction = "Implement Kotlin code for a simple Order entity.",
+            requestedWorkflowType = WorkflowType.CODE_REVIEW
+        ),
+        OrchestrationTask(
+            id = "task-002",
+            title = "Explicit CODE_ONLY utility",
+            instruction = "Implement a small Kotlin utility function that formats a customer full name.",
+            requestedWorkflowType = WorkflowType.CODE_ONLY
+        ),
+        OrchestrationTask(
+            id = "task-003",
+            title = "Explicit CODE_REVIEW Room",
+            instruction = """
+            Implement Kotlin code for a local Android persistence layer that stores customer orders and their items using Room.
+            The code should allow creating an order with multiple items and retrieving the full order details later.
+            Keep the design simple and maintainable.
+        """.trimIndent(),
+            requestedWorkflowType = WorkflowType.CODE_REVIEW
+        ),
+        OrchestrationTask(
+            id = "task-004",
+            title = "Explicit CODE_REVIEW Retrofit",
+            instruction = "Implement a Retrofit API service for fetching users from a REST API.",
+            requestedWorkflowType = WorkflowType.CODE_REVIEW
+        ),
+        OrchestrationTask(
+            id = "task-005",
+            title = "Explicit CODE_REVIEW_TEST utility",
+            instruction = "Implement an email validator utility and unit tests.",
+            requestedWorkflowType = WorkflowType.CODE_REVIEW_TEST
+        ),
+        /*OrchestrationTask(
+            id = "task-006",
+            title = "Explicit CODE_REVIEW_DOCUMENTATION ViewModel",
+            instruction = "Implement an Android ViewModel that exposes customer UI state with StateFlow and document how it works.",
+            requestedWorkflowType = WorkflowType.CODE_REVIEW_DOCUMENTATION
+        ),*/
+        /*OrchestrationTask(
+            id = "task-007",
+            title = "Explicit CODE_REVIEW_TEST_DOCUMENTATION sync",
+            instruction = """
+            Implement a synchronization worker that uploads local pending orders and downloads remote order updates.
+            Include basic sync status handling, unit tests, and documentation.
+        """.trimIndent(),
+            requestedWorkflowType = WorkflowType.CODE_REVIEW_TEST_DOCUMENTATION
+        ),*/
+        OrchestrationTask(
+            id = "task-008",
+            title = "Explicit REVIEW_ONLY",
+            instruction = """
+            Review this Kotlin code and list confirmed issues:
+            
+            data class User(val id: String, val name: String)
+        """.trimIndent(),
+            requestedWorkflowType = WorkflowType.REVIEW_ONLY
+        ),
+        /*OrchestrationTask(
+            id = "task-009",
+            title = "Explicit DOCUMENTATION_ONLY",
+            instruction = "Write documentation for the workflow package.",
+            requestedWorkflowType = WorkflowType.DOCUMENTATION_ONLY
+        ),*/
+        OrchestrationTask(
+            id = "task-010",
+            title = "Planning fallback ambiguous request",
+            instruction = "Help me improve this feature behavior."
+        ),
+        OrchestrationTask(
+            id = "task-011",
+            title = "Planning fallback unclear technical request",
+            instruction = "I need something cleaner and more maintainable for this part of the app."
+        )
     )
 
-    // Create the execution context shared with all agents during this run.
-    val context = ExecutionContext(projectPath = ".")
+    demoTasks.forEach { task ->
+        val context = ExecutionContext(
+            projectPath = "."
+        )
 
-    // Execute the task through the orchestrator and collect the final result.
-    val result = orchestrator.execute(task, context)
+        val result = orchestrator.execute(task, context)
 
-    // Print the orchestration result to the console.
+        printResult(result)
+    }
+}
+
+private fun printResult(result: org.dcac.models.OrchestrationResult) {
+    println()
+    println("========================================")
     println("Task: ${result.taskId}")
     println("Success: ${result.success}")
+    println("========================================")
 
     if (result.errors.isNotEmpty()) {
         println("Errors:")
@@ -145,60 +222,7 @@ fun main() {
         println("${YELLOW}${agentResult.output}${RESET}")
         println("----------------------------------------")
     }
-
-    val task2 = OrchestrationTask(
-        id = "task-002",
-        title = "Create local order persistence",
-        instruction = """
-        Implement Kotlin code for a local Android persistence layer that stores customer orders and their items using Room.
-        The code should allow creating an order with multiple items and retrieving the full order details later.
-        Keep the design simple, maintainable, and appropriate for a production Android app.
-    """.trimIndent(),
-    )
-
-    val result2 = orchestrator.execute(task2, context)
-
-    println("Task: ${result2.taskId}")
-    println("Success: ${result2.success}")
-
-    if (result2.errors.isNotEmpty()) {
-        println("Errors:")
-        result2.errors.forEach { error ->
-            println("${RED}- $error${RESET}")
-        }
-    }
-
-    if (!result2.finalResponse.isNullOrBlank()) {
-        println()
-        println("Final Response:")
-        println("${YELLOW}${result2.finalResponse}${RESET}")
-        println("----------------------------------------")
-    }
-
-    if (result2.results.isNotEmpty()) {
-        println()
-        println("Developer Details:")
-        println("Separated agent responses")
-        println("----------------------------------------")
-    }
-
-    result2.results.forEach { agentResult ->
-        println()
-        println("Agent metadata generated by Kotlin code:")
-        println("Agent: ${agentResult.agentId}")
-        println("Role: ${agentResult.role}")
-        println("Model: ${agentResult.model}")
-        println("Success: ${agentResult.success}")
-
-        if (agentResult.errorMessage != null) {
-            println("Error generated by Kotlin error handling:")
-            println("${RED}${agentResult.errorMessage}${RESET}")
-        }
-
-        println()
-        println("Model response generated by local AI:")
-        println("${YELLOW}${agentResult.output}${RESET}")
-        println("----------------------------------------")
-    }
 }
+
+
 

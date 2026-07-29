@@ -613,5 +613,90 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - Parallel execution is not implemented yet
 
 
+### 🔹 **Update #10**
+
+  - 🎛️ **Explicit workflow selection**
+    - Added optional explicit workflow selection through `OrchestrationTask.requestedWorkflowType`
+    - Prepared the orchestration model for a future UI/API workflow selector
+    - Moved workflow intent toward explicit user-selected values instead of keyword-based workflow inference
+    - Supported explicit workflow choices such as:
+      - `CODE_ONLY`
+      - `CODE_REVIEW`
+      - `REVIEW_ONLY`
+      - future `CODE_REVIEW_TEST`
+      - future `CODE_REVIEW_DOCUMENTATION`
+      - future `CODE_REVIEW_TEST_DOCUMENTATION`
+      - future `DOCUMENTATION_ONLY`
+    - Updated `AiOrchestrator` to use `requestedWorkflowType` directly when provided
+    - Kept `PlanningAgent` as a fallback when no explicit workflow type is provided
+    - Avoided calling the planning model for tasks that already provide an explicit workflow type
+
+  - 🧩 **Workflow planning cleanup**
+    - Removed `FastPathWorkflowPlanner` from the active architecture
+    - Removed keyword-based workflow-type inference from the active workflow
+    - Removed the temporary `ExecutionMode` experiment and the `FAST` / `AUTO` / `SAFE` execution modes
+    - Simplified workflow selection around explicit workflow type plus planning fallback
+    - Updated `WorkflowPlanner` to create workflow plans from:
+      - explicit `WorkflowType`
+      - selected `PromptDomain`
+      - deterministic complexity rules
+    - Kept `WorkflowPlanner` responsible for mapping selected workflow types to ordered agent identifiers
+    - Kept `TaskRouter` responsible for resolving planned agent identifiers into concrete agent instances
+
+  - 🧠 **Prompt-domain keyword centralization**
+    - Extracted prompt-domain keyword lists into dedicated keyword definitions
+    - Kept prompt-domain detection automatic through `PromptSelector`
+    - Reduced keyword clutter inside `PromptSelector`
+    - Made domain keyword rules easier to review, extend, and later externalize
+    - Clarified the separation between:
+      - workflow type selection
+      - prompt-domain detection
+      - workflow-to-agent routing
+
+  - 🔁 **Updated orchestration flow**
+    - `AiOrchestrator` now validates the task before any planning or agent execution
+    - `AiOrchestrator` detects the prompt domain once with `PromptSelector`
+    - The selected prompt domain is stored in `ExecutionContext`
+    - If `OrchestrationTask.requestedWorkflowType` is provided, `AiOrchestrator` creates a workflow plan without calling `PlanningAgent`
+    - If no explicit workflow type is provided, `AiOrchestrator` calls `PlanningAgent` as a fallback
+    - `WorkflowPlanner` creates or completes the final `WorkflowPlan`
+    - `WorkflowPlanner` resolves selected workflow types into ordered agent identifiers
+    - `TaskRouter` maps planned agent identifiers to concrete agent instances
+    - `CodeAgent` and `ReviewAgent` continue using the centralized prompt domain from `ExecutionContext`
+
+    - 🧪 **Test suite realignment**
+    - Updated tests to distinguish explicit workflow execution from planning fallback execution
+    - Updated `AiOrchestratorTest` to verify that explicit workflow types bypass `PlanningAgent`
+    - Updated `AiOrchestratorTest` to verify that tasks without `requestedWorkflowType` still use planning fallback
+    - Updated `WorkflowPlannerTest` to cover explicit workflow plan creation and complexity estimation from workflow type and prompt domain
+    - Updated `TaskRouterTest` to inject `FakeOrchestrationLogger`
+    - Preserved test coverage for:
+      - workflow plan creation
+      - workflow-to-agent mapping
+      - planned agent routing
+      - concrete agent execution
+      - agent output sharing through `ExecutionContext.agentOutputs`
+      - validation failures stopping before planning or agent execution
+
+  - ✅ **Runtime validation goals**
+    - Explicit workflow tasks should skip `PlanningAgent`
+    - Tasks without `requestedWorkflowType` should still call `PlanningAgent`
+    - Prompt-domain detection should remain automatic regardless of how the workflow type is selected
+    - `WorkflowPlanner` should continue to produce the correct agent pipeline for each selected workflow type
+    - `TaskRouter` should continue to preserve planned agent order
+
+  - ⚠️ **Current workflow limitations**
+    - Workflow type selection is currently simulated in `App.kt`
+    - The future UI/API layer for selecting workflow types is not implemented yet
+    - Planning still selects workflow type in fallback mode, but future planning may be reworked toward prompt-domain or request-analysis fallback
+    - Prompt-domain detection is still keyword-based
+    - Test and documentation workflow types exist as selectable workflow types, but dedicated agents are not implemented yet
+    - `CODE_REVIEW_TEST`, `CODE_REVIEW_DOCUMENTATION`, and `CODE_REVIEW_TEST_DOCUMENTATION` currently resolve only to implemented agents until future agents exist
+    - Generated code quality still depends heavily on model output
+    - Kotlin-side artifact extraction and validation are not implemented yet
+    - `ReviewAgent` can still review non-code outputs if `CodeAgent` fails to produce reviewable code
+    - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
+
+
 ## 🤝 **Contributions**
 Contributions are welcome! Feel free to fork the repository and submit a pull request for new features or bug fixes✅🟩❌.

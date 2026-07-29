@@ -54,9 +54,11 @@ Current properties:
 - `id` → unique identifier used to track the task
 - `title` → human-readable title describing the task
 - `instruction` → detailed user request sent to the planning and execution workflow
+- `requestedWorkflowType` → optional workflow type selected explicitly by the user or future UI/API
 
-The active workflow no longer requires a manually assigned task type.
-The user instruction is analyzed by the planning step to choose the workflow.
+The active workflow can receive an explicit `requestedWorkflowType`.
+When this value is provided, `AiOrchestrator` uses it directly and skips planning.
+When it is absent, `PlanningAgent` can still analyze the instruction as a fallback.
 
 This model is currently used by:
 - `TaskValidator`
@@ -79,7 +81,7 @@ Its purpose is to standardize how work units move through the system.
 
 ### `WorkflowType`
 
-`WorkflowType` defines the execution strategy selected by the planning step.
+`WorkflowType` defines the execution strategy selected explicitly by the caller or returned by planning fallback.
 Its role is to represent what kind of workflow should run for a user request.
 
 Current values:
@@ -92,7 +94,8 @@ Current values:
 - `DOCUMENTATION_ONLY` → documentation-focused workflow
 - `GENERAL` → fallback workflow
 
-`WorkflowType` is selected by `PlanningAgent` and then resolved by `WorkflowPlanner` into ordered agent identifiers.
+`WorkflowType` may come from `OrchestrationTask.requestedWorkflowType` or from `PlanningAgent` fallback.
+It is then resolved by `WorkflowPlanner` into ordered agent identifiers.
 Its purpose is to separate the user intent from the actual agent pipeline.
 
 
@@ -105,10 +108,10 @@ Current values:
 - `MODERATE` → request involving multiple concerns or structured implementation
 - `COMPLEX` → request likely requiring several workflow steps, more context, or future specialized agents
 
-`TaskComplexity` is selected by `PlanningAgent`.
+`TaskComplexity` may be returned by `PlanningAgent` fallback or estimated deterministically by `WorkflowPlanner` for explicit workflows.
 
 It is currently used mainly for observability and future workflow decisions.
-It may later influence model selection, test generation, documentation generation, or whether a deterministic fast path is allowed.
+It may later influence model selection, test generation, documentation generation, correction loops, or workflow diagnostics.
 Prompt selection is currently handled separately through `PromptDomain` and `PromptSelector`.
 
 
@@ -146,14 +149,15 @@ Current properties:
 - `reason` → short explanation of why the workflow was selected
 
 Current workflow usage:
-- `PlanningAgent` produces the initial workflow decision
-- `WorkflowPlanner` completes the plan by filling `agentIds`
+- `OrchestrationTask.requestedWorkflowType` can provide the workflow explicitly
+- `PlanningAgent` can produce a fallback workflow decision when no explicit workflow is provided
+- `WorkflowPlanner` creates or completes the plan by filling `agentIds` and estimating complexity when needed
 - `TaskRouter` uses `agentIds` to select concrete agent instances
 - `AiOrchestrator` executes selected agents in the planned order
 - `AiOrchestrator` stores the selected prompt domain in `ExecutionContext.promptDomain`
 - `CodeAgent` and `ReviewAgent` read `promptDomain` to load domain-specific prompts
 
-Its purpose is to make workflow selection explicit, inspectable, and deterministic after the planning decision.
+Its purpose is to make workflow selection explicit, inspectable, and deterministic whether the workflow came from the caller or from planning fallback.
 `WorkflowPlan` does not currently store prompt domain information.
 Prompt domain detection is currently performed once by `AiOrchestrator` and stored in `ExecutionContext`.
 This keeps workflow selection and prompt specialization separate.
@@ -202,10 +206,10 @@ Current properties:
 `AgentResult.errorMessage` is used for agent-level failures, while `OrchestrationResult.errors` is used for validation or orchestration-level failures.
 
 Current executable agent assignments:
-- `code` → `CodeAgent` using the current code model candidate
-- `review` → `ReviewAgent` using the current review model candidate
+- `code` → `CodeAgent` using the configured code model
+- `review` → `ReviewAgent` using the configured review model
 
-The planning step produces a `WorkflowPlan`, while executable agents produce `AgentResult` values.
+The workflow step produces a `WorkflowPlan`, either from explicit workflow selection or planning fallback, while executable agents produce `AgentResult` values.
 `AgentResult.model` is populated from `LlmResponse.actualModel`, meaning it reflects the model confirmed by the backend response.
 
 In the future, `AgentResult` may also contain:

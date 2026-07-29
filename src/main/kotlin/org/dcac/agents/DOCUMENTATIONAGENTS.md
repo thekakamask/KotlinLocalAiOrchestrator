@@ -21,11 +21,12 @@ The current active text-based agents are:
 - `CodeAgent`
 - `ReviewAgent`
 
-The current workflow is a planning-based code and review pipeline.
+The current workflow is an explicit workflow orchestration pipeline with planning fallback.
 
-Instead:
-- `PlanningAgent` analyzes the user request and selects a workflow type, complexity level, and reason
-- `WorkflowPlanner` resolves that decision into ordered agent identifiers
+Current flow:
+- `OrchestrationTask.requestedWorkflowType` can provide the workflow type explicitly
+- `PlanningAgent` is used as a fallback when no explicit workflow type is provided
+- `WorkflowPlanner` creates or completes the workflow plan and resolves it into ordered agent identifiers
 - `TaskRouter` maps those identifiers to concrete agent instances
 - `AiOrchestrator` executes the selected agents sequentially
 - `CodeAgent` generates implementation output when selected
@@ -106,7 +107,7 @@ Its purpose is to keep planning output structured, predictable, and easy to proc
 
 ### `PlanningAgent`
 
-`PlanningAgent` is the workflow selection agent.
+`PlanningAgent` is the fallback workflow selection agent.
 
 Current configuration:
 - role → workflow planning agent
@@ -133,16 +134,17 @@ Unlike regular executable agents, `PlanningAgent` is used before the main agent 
 Its role is to help choose the workflow, not to produce user-facing implementation output.
 
 Current capabilities:
-- workflow selection
+- fallback workflow selection
 - complexity estimation
 - planning reason generation
 - structured planning response parsing
-- fallback workflow selection when planning fails
+- default fallback workflow when planning fails
 - planning fallback logging through `OrchestrationLogger`
 
 Current limitations:
 - planning is still performed by a local LLM and can be slow for simple requests
-- obvious workflow decisions may later be handled by deterministic Kotlin code
+- explicit workflow selection now bypasses planning, but fallback planning still selects workflow type when no explicit workflow is provided
+- future planning may be reworked toward prompt-domain or request-analysis fallback instead of workflow selection
 - invalid or malformed planning JSON is handled with a fallback workflow
 
 
@@ -260,34 +262,38 @@ Possible future responsibilities:
 
 ## ⚙️ Current Agent Workflow
 
-The current workflow is selected dynamically instead of being a fixed manager → code → review chain.
+The current workflow is selected explicitly when `requestedWorkflowType` is provided, or dynamically through planning fallback when it is not.
 
 Current high-level flow:
-1. `AiOrchestrator` validates the incoming `OrchestrationTask`.
-2. `PlanningAgent` analyzes the user instruction.
-3. `PlanningAgent` returns a workflow type, complexity level, and reason.
-4. `WorkflowPlanner` converts the selected workflow into ordered agent identifiers.
-5. `TaskRouter` resolves the planned identifiers into concrete agent instances.
-6. `App.kt` injects configured model names into `PlanningAgent`, `CodeAgent`, and `ReviewAgent`.
-7. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
-8. The selected prompt domain is stored in `ExecutionContext`.
-9. `CodeAgent` and `ReviewAgent` read the prompt domain from `ExecutionContext`.
-10. `PromptSelector` resolves the matching code or review prompt path.
-11. `PromptLoader` loads the selected prompt for the current agent.
-12. `CodeAgent` generates implementation output when selected.
-13. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
-14. `ReviewAgent` reviews the generated code when selected.
-15. Each executable agent returns an enriched `AgentResult`.
-16. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
-17. The results are aggregated into an `OrchestrationResult`.
-18. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
+1. `App.kt` wires `PlanningAgent`, `CodeAgent`, and `ReviewAgent` with configured model names.
+2. `AiOrchestrator` validates the incoming `OrchestrationTask`.
+3. `AiOrchestrator` detects the prompt domain once with `PromptSelector`.
+4. The selected prompt domain is stored in `ExecutionContext`.
+5. If `OrchestrationTask.requestedWorkflowType` is provided, `AiOrchestrator` uses it directly.
+6. If no explicit workflow type is provided, `PlanningAgent` analyzes the user instruction as a fallback.
+7. `PlanningAgent` returns a fallback workflow type, complexity level, and reason.
+8. `WorkflowPlanner` creates or completes the workflow plan.
+9. `WorkflowPlanner` resolves the workflow type into ordered agent identifiers.
+10. `TaskRouter` resolves the planned identifiers into concrete agent instances.
+11. `CodeAgent` and `ReviewAgent` read the prompt domain from `ExecutionContext`.
+12. `PromptSelector` resolves the matching code or review prompt path.
+13. `PromptLoader` loads the selected prompt for the current agent.
+14. `CodeAgent` generates implementation output when selected.
+15. `AiOrchestrator` stores the code output in `ExecutionContext.agentOutputs["code"]`.
+16. `ReviewAgent` reviews the generated code when selected.
+17. Each executable agent returns an enriched `AgentResult`.
+18. If an executable agent fails, it returns a failed `AgentResult` instead of crashing the application.
+19. The results are aggregated into an `OrchestrationResult`.
+20. The collected agent results are used by `ResponseSynthesizer` to build the final user-facing response.
+
+Workflow mappings are selected either from `OrchestrationTask.requestedWorkflowType` or from planning fallback.
 
 Example workflow mappings:
 - `CODE_ONLY` → `CodeAgent`
 - `CODE_REVIEW` → `CodeAgent`, then `ReviewAgent`
 - `REVIEW_ONLY` → `ReviewAgent`
 
-Future workflow mappings may include:
+Current future-oriented workflow types exist, but currently resolve only to implemented agents until dedicated agents are added:
 - `CODE_REVIEW_TEST`
 - `CODE_REVIEW_DOCUMENTATION`
 - `CODE_REVIEW_TEST_DOCUMENTATION`

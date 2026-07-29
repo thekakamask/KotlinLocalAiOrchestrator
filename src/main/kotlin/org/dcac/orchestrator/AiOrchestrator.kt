@@ -69,48 +69,46 @@ class AiOrchestrator(
         }
 
         logger.taskValidationSucceeded()
-        logger.planningStarted()
 
-        // Store the start time of the planning step.
-        val planningStartTime = System.currentTimeMillis()
+        val promptDomain = promptSelector.detectDomain(task.instruction)
+        logger.promptDomainSelected(promptDomain)
 
-        // Track whether the planning agent is still running.
-        val isPlanningRunning = AtomicBoolean(true)
+        val workflowPlan = task.requestedWorkflowType?.let { workflowType ->
+            workflowPlanner.createPlan(
+                workflowType = workflowType,
+                promptDomain = promptDomain,
+                reason = "Workflow selected explicitly by the user."
+            )
+        } ?: run {
+            logger.planningStarted()
 
-        // Start a progress timer while the planning agent selects the workflow.
-        val planningProgressThread = TimeUtils.startProgressTimer(
-            label = "Planning workflow",
-            isRunning = isPlanningRunning,
-            startTime = planningStartTime
-        )
+            val planningStartTime = System.currentTimeMillis()
+            val isPlanningRunning = AtomicBoolean(true)
 
-        // Ask the planning agent to choose the best workflow for this task.
-        val initialPlan = planningAgent.plan(task)
+            val planningProgressThread = TimeUtils.startProgressTimer(
+                label = "Planning workflow",
+                isRunning = isPlanningRunning,
+                startTime = planningStartTime
+            )
 
-        // Stop the planning progress timer.
-        isPlanningRunning.set(false)
-        planningProgressThread.join()
+            val plannedByModel = planningAgent.plan(task)
 
-        // Calculate the total planning duration.
-        val planningDurationMs = System.currentTimeMillis() - planningStartTime
+            isPlanningRunning.set(false)
+            planningProgressThread.join()
 
-        logger.planningCompleted(TimeUtils.formatDuration(planningDurationMs))
+            val planningDurationMs = System.currentTimeMillis() - planningStartTime
 
-        // Complete the plan by resolving the selected workflow into agent identifiers.
-        val workflowPlan = workflowPlanner.complete(initialPlan)
+            logger.planningCompleted(TimeUtils.formatDuration(planningDurationMs))
 
-        // Display the selected workflow for debugging and observability.
-        // Display the estimated workflow complexity.
-        // Display the short explanation returned by the planning agent.
+            workflowPlanner.complete(plannedByModel)
+        }
+
         logger.workflowSelected(
             workflowPlan.workflowType,
             workflowPlan.complexity,
             workflowPlan.reason
         )
 
-        val promptDomain = promptSelector.detectDomain(task.instruction)
-
-        logger.promptDomainSelected(promptDomain)
         logger.routingStarted()
 
         // Select the concrete agent instances from the planned agent identifiers.

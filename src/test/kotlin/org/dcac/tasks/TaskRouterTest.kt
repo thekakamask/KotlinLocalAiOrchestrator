@@ -1,6 +1,7 @@
 package org.dcac.tasks
 
 import org.dcac.fakeData.FakeAgent
+import org.dcac.fakeData.FakeOrchestrationLogger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -12,7 +13,8 @@ class TaskRouterTest {
         val reviewAgent = FakeAgent(id = "review")
 
         val router = TaskRouter(
-            agents = listOf(reviewAgent, codeAgent)
+            agents = listOf(reviewAgent, codeAgent),
+            logger = FakeOrchestrationLogger()
         )
 
         val selectedAgents = router.route(
@@ -28,7 +30,8 @@ class TaskRouterTest {
         val reviewAgent = FakeAgent(id = "review")
 
         val router = TaskRouter(
-            agents = listOf(codeAgent, reviewAgent)
+            agents = listOf(codeAgent, reviewAgent),
+            logger = FakeOrchestrationLogger()
         )
 
         val selectedAgents = router.route(
@@ -41,7 +44,8 @@ class TaskRouterTest {
     @Test
     fun route_whenNoAgentMatches_returnsEmptyList() {
         val router = TaskRouter(
-            agents = listOf(FakeAgent(id = "code"))
+            agents = listOf(FakeAgent(id = "code")),
+            logger = FakeOrchestrationLogger()
         )
 
         val selectedAgents = router.route(

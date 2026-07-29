@@ -189,7 +189,7 @@ Before generation starts, `ApplicationConfigLoader` loads the Ollama base URL an
 8. If the request or response handling fails, `OllamaClient` throws an `LlmClientException`.
 9. If generation succeeds, `OllamaClient` creates an `LlmResponse`.
 10. The caller reads `LlmResponse.actualModel` and `LlmResponse.text`.
-11. `PlanningAgent` uses the response text to build a workflow decision.
+11. When planning fallback is used, `PlanningAgent` uses the response text to build a workflow decision.
 12. Executable agents use the response values to build an enriched `AgentResult`.
 13. If the client throws an exception, the caller handles it according to its role.
 14. `PlanningAgent` falls back to a default workflow when generation or parsing fails.

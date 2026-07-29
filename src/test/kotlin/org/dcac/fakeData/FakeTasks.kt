@@ -35,4 +35,12 @@ object FakeTasks {
             instruction = ""
         )
     }
+
+    fun ambiguousTask(): OrchestrationTask {
+        return OrchestrationTask(
+            id = "ambiguous-task",
+            title = "Improve module",
+            instruction = "Help me improve this module behavior."
+        )
+    }
 }
