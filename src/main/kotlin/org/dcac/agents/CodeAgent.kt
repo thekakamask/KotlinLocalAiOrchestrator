@@ -31,14 +31,6 @@ class CodeAgent(
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
         return try {
 
-            // Build the user prompt from the original instruction.
-            val userPrompt = """
-            User instruction:
-            ${task.instruction}
-            
-            Generate only the implementation based on the user instruction.
-            """.trimIndent()
-
             val promptDomain = context.promptDomain
 
             val promptPath = promptSelector.codePromptPathFor(promptDomain)
@@ -51,12 +43,27 @@ class CodeAgent(
 
             val systemPrompt = promptLoader.loadPrompt(promptPath)
 
+            // Build the user prompt from the original instruction.
+            val userPrompt = """
+            User instruction:
+            ${task.instruction}
+            
+            Generate only the implementation based on the user instruction.
+            """.trimIndent()
+
             // Ask the configured local LLM model to generate the code response.
             val llmResponse = llmClient.generate(
                 model = model,
                 systemPrompt = systemPrompt,
                 userPrompt = userPrompt
             )
+
+            llmResponse.metrics?.let { metrics ->
+                logger.llmMetricsRecorded(
+                    agentId = id,
+                    metrics = metrics
+                )
+            }
 
             // Build a structured result for the orchestrator.
             AgentResult(
@@ -66,7 +73,8 @@ class CodeAgent(
                 // Mark this execution as successful if no exception was thrown.
                 success = true,
                 model = llmResponse.actualModel,
-                output = llmResponse.text
+                output = llmResponse.text,
+                llmMetrics = llmResponse.metrics
             )
         } catch ( exception: Exception) {
             // Return a failed result instead of crashing the full orchestration workflow.

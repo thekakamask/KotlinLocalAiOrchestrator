@@ -81,9 +81,9 @@ class WorkflowPlanner {
 
             WorkflowType.REVIEW_ONLY -> listOf("review")
 
-            WorkflowType.DOCUMENTATION_ONLY -> emptyList()
+            WorkflowType.DOCUMENTATION_ONLY -> listOf("review")
 
-            WorkflowType.GENERAL -> listOf("code", "review")
+            WorkflowType.GENERAL -> listOf("general")
         }
     }
 }

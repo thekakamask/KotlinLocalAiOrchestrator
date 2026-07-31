@@ -24,7 +24,7 @@ class PromptSelector {
             containsAny(normalizedInstruction, PromptDomainKeywords.documentation) -> PromptDomain.DOCUMENTATION
             containsAny(normalizedInstruction, PromptDomainKeywords.model) -> PromptDomain.MODEL
             containsAny(normalizedInstruction, PromptDomainKeywords.utility) -> PromptDomain.UTILITY
-            else -> PromptDomain.GENERAL
+            else -> PromptDomain.GENERIC
         }
     }
 
@@ -45,7 +45,7 @@ class PromptSelector {
             PromptDomain.TEST -> "prompts/code/test.txt"
             PromptDomain.DOCUMENTATION -> "prompts/code/documentation.txt"
             PromptDomain.UTILITY -> "prompts/code/utility.txt"
-            PromptDomain.GENERAL -> "prompts/code/general.txt"
+            PromptDomain.GENERIC -> "prompts/code/general.txt"
         }
     }
 
@@ -66,7 +66,7 @@ class PromptSelector {
             PromptDomain.TEST -> "prompts/review/test.txt"
             PromptDomain.DOCUMENTATION -> "prompts/review/documentation.txt"
             PromptDomain.UTILITY -> "prompts/review/utility.txt"
-            PromptDomain.GENERAL -> "prompts/review/general.txt"
+            PromptDomain.GENERIC -> "prompts/review/general.txt"
         }
     }
 

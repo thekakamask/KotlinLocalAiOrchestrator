@@ -1,5 +1,6 @@
 package org.dcac.logging
 
+import org.dcac.metrics.LlmGenerationMetrics
 import org.dcac.models.TaskComplexity
 import org.dcac.models.WorkflowType
 import org.dcac.prompts.PromptDomain
@@ -86,5 +87,26 @@ class ConsoleOrchestrationLogger: OrchestrationLogger {
 
     override fun orchestrationCompleted(duration: String) {
         println("Orchestration completed in $duration.")
+    }
+
+    override fun llmMetricsRecorded(agentId: String, metrics: LlmGenerationMetrics) {
+        println(
+            """
+        LLM metrics: $agentId
+        - total: %.0f ms
+        - model loading: %.0f ms
+        - prompt: %d tokens at %.1f tokens/s
+        - generation: %d tokens at %.1f tokens/s
+        - client round trip: %.0f ms
+        """.trimIndent().format(
+                metrics.totalDurationMs,
+                metrics.loadDurationMs,
+                metrics.promptTokenCount,
+                metrics.promptTokensPerSecond ?: 0.0,
+                metrics.generatedTokenCount,
+                metrics.generatedTokensPerSecond ?: 0.0,
+                metrics.clientRoundTripDurationMs ?: 0.0
+            )
+        )
     }
 }

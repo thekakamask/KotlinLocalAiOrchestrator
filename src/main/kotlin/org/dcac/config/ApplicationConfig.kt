@@ -4,5 +4,6 @@ data class ApplicationConfig(
     val ollamaBaseUrl: String,
     val planningModel: String,
     val codeModel: String,
-    val reviewModel: String
+    val reviewModel: String,
+    val generalModel:String
 )

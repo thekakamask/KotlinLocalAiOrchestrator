@@ -1,6 +1,7 @@
 package org.dcac
 
 import org.dcac.agents.CodeAgent
+import org.dcac.agents.GeneralAgent
 import org.dcac.agents.PlanningAgent
 import org.dcac.agents.ReviewAgent
 import org.dcac.client.OllamaClient
@@ -74,6 +75,12 @@ fun main() {
                     promptSelector = promptSelector,
                     model = config.reviewModel,
                     logger = logger
+                ),
+                GeneralAgent(
+                    llmClient = ollamaClient,
+                    promptLoader = promptLoader,
+                    model = config.generalModel,
+                    logger = logger
                 )
             ),
             logger = logger
@@ -90,79 +97,35 @@ fun main() {
     val demoTasks = listOf(
         OrchestrationTask(
             id = "task-001",
-            title = "Explicit CODE_REVIEW model",
-            instruction = "Implement Kotlin code for a simple Order entity.",
-            requestedWorkflowType = WorkflowType.CODE_REVIEW
-        ),
-        OrchestrationTask(
-            id = "task-002",
-            title = "Explicit CODE_ONLY utility",
-            instruction = "Implement a small Kotlin utility function that formats a customer full name.",
+            title = "Explicit CODE_ONLY simple model",
+            instruction = "Implement Kotlin code for a simple Order data class.",
             requestedWorkflowType = WorkflowType.CODE_ONLY
         ),
+
         OrchestrationTask(
-            id = "task-003",
-            title = "Explicit CODE_REVIEW Room",
+            id = "task-002",
+            title = "Explicit CODE_REVIEW moderate Room",
             instruction = """
-            Implement Kotlin code for a local Android persistence layer that stores customer orders and their items using Room.
-            The code should allow creating an order with multiple items and retrieving the full order details later.
+            Implement Kotlin code for a local Android persistence layer
+            that stores customer orders and their items using Room.
+            The code should allow creating an order with multiple items
+            and retrieving the full order details later.
             Keep the design simple and maintainable.
         """.trimIndent(),
             requestedWorkflowType = WorkflowType.CODE_REVIEW
         ),
-        OrchestrationTask(
-            id = "task-004",
-            title = "Explicit CODE_REVIEW Retrofit",
-            instruction = "Implement a Retrofit API service for fetching users from a REST API.",
-            requestedWorkflowType = WorkflowType.CODE_REVIEW
-        ),
-        OrchestrationTask(
-            id = "task-005",
-            title = "Explicit CODE_REVIEW_TEST utility",
-            instruction = "Implement an email validator utility and unit tests.",
-            requestedWorkflowType = WorkflowType.CODE_REVIEW_TEST
-        ),
+
         /*OrchestrationTask(
-            id = "task-006",
-            title = "Explicit CODE_REVIEW_DOCUMENTATION ViewModel",
-            instruction = "Implement an Android ViewModel that exposes customer UI state with StateFlow and document how it works.",
-            requestedWorkflowType = WorkflowType.CODE_REVIEW_DOCUMENTATION
-        ),*/
-        /*OrchestrationTask(
-            id = "task-007",
-            title = "Explicit CODE_REVIEW_TEST_DOCUMENTATION sync",
+            id = "task-003",
+            title = "Planning fallback complex synchronization",
             instruction = """
-            Implement a synchronization worker that uploads local pending orders and downloads remote order updates.
-            Include basic sync status handling, unit tests, and documentation.
-        """.trimIndent(),
-            requestedWorkflowType = WorkflowType.CODE_REVIEW_TEST_DOCUMENTATION
-        ),*/
-        OrchestrationTask(
-            id = "task-008",
-            title = "Explicit REVIEW_ONLY",
-            instruction = """
-            Review this Kotlin code and list confirmed issues:
-            
-            data class User(val id: String, val name: String)
-        """.trimIndent(),
-            requestedWorkflowType = WorkflowType.REVIEW_ONLY
-        ),
-        /*OrchestrationTask(
-            id = "task-009",
-            title = "Explicit DOCUMENTATION_ONLY",
-            instruction = "Write documentation for the workflow package.",
-            requestedWorkflowType = WorkflowType.DOCUMENTATION_ONLY
-        ),*/
-        OrchestrationTask(
-            id = "task-010",
-            title = "Planning fallback ambiguous request",
-            instruction = "Help me improve this feature behavior."
-        ),
-        OrchestrationTask(
-            id = "task-011",
-            title = "Planning fallback unclear technical request",
-            instruction = "I need something cleaner and more maintainable for this part of the app."
-        )
+            Implement a synchronization worker that uploads local pending
+            orders and downloads remote order updates.
+            Include unit tests, code review, and technical documentation.
+        """.trimIndent()
+            // Pas de requestedWorkflowType :
+            // le PlanningAgent sera utilisé.
+        )*/
     )
 
     demoTasks.forEach { task ->

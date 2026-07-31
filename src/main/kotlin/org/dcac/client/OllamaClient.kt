@@ -43,6 +43,7 @@ class OllamaClient(
             // Convert the request object into valid JSON.
             val requestBody = json.encodeToString(generateRequest)
 
+
             // Build the HTTP request sent to Ollama's generation endpoint.
             val httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create("${baseUrl.trimEnd('/')}/api/generate"))
@@ -51,10 +52,15 @@ class OllamaClient(
                 .build()
 
             // Send the HTTP request synchronously.
+            val clientStartNs = System.nanoTime()
+
             val httpResponse = httpClient.send(
                 httpRequest,
                 HttpResponse.BodyHandlers.ofString()
             )
+
+            val clientRoundTripDurationNs =
+                System.nanoTime() - clientStartNs
 
             // Stop execution if Ollama returns an HTTP error.
             if (httpResponse.statusCode() !in 200..299) {
@@ -71,7 +77,10 @@ class OllamaClient(
             return LlmResponse(
                 requestedModel = model,
                 actualModel = generateResponse.model,
-                text = generateResponse.response.trim()
+                text = generateResponse.response.trim(),
+                metrics = generateResponse.toMetrics(
+                    clientRoundTripDurationNs = clientRoundTripDurationNs
+                )
             )
         } catch (exception : LlmClientException) {
             // Keep already structured LLM errors unchanged.

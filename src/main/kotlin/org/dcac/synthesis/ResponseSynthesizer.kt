@@ -14,6 +14,7 @@ class ResponseSynthesizer {
     ): String {
         val codeOutput = results.firstOrNull { it.agentId == "code" }?.output
         val reviewOutput = results.firstOrNull { it.agentId == "review" }?.output
+        val generalOutput = results.firstOrNull { it.agentId == "general" }?.output
         val failedAgents = results.filter { !it.success }
 
         if (results.isEmpty()) {
@@ -50,6 +51,12 @@ class ResponseSynthesizer {
                 appendLine()
                 appendLine("Review summary:")
                 appendLine(reviewOutput)
+            }
+
+            if (!generalOutput.isNullOrBlank()) {
+                appendLine()
+                appendLine("General response:")
+                appendLine(generalOutput)
             }
         }.trim()
     }

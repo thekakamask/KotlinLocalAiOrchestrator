@@ -15,6 +15,6 @@ data class ExecutionContext(
     val userLocale: String = "fr-FR",
     // Stores outputs already produced by previous agents during the same workflow.
     val agentOutputs: Map<String, String> = emptyMap(),
-    val promptDomain: PromptDomain = PromptDomain.GENERAL
+    val promptDomain: PromptDomain = PromptDomain.GENERIC
 )
 

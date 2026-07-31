@@ -31,6 +31,18 @@ class ReviewAgent(
     override fun run(task: OrchestrationTask, context: ExecutionContext): AgentResult {
         return try {
 
+            val promptDomain = context.promptDomain
+
+            val promptPath = promptSelector.reviewPromptPathFor(promptDomain)
+
+            logger.promptSelected(
+                agentId = id,
+                promptDomain = promptDomain,
+                promptPath = promptPath
+            )
+
+            val systemPrompt = promptLoader.loadPrompt(promptPath)
+
             // Read the code output produced by the CodeAgent.
             val generatedCode = context.agentOutputs["code"]
 
@@ -46,18 +58,6 @@ class ReviewAgent(
              Focus on correctness, maintainability, missing requirements, risks, and concrete improvements.
              """.trimIndent()
 
-            val promptDomain = context.promptDomain
-
-            val promptPath = promptSelector.reviewPromptPathFor(promptDomain)
-
-            logger.promptSelected(
-                agentId = id,
-                promptDomain = promptDomain,
-                promptPath = promptPath
-            )
-
-            val systemPrompt = promptLoader.loadPrompt(promptPath)
-
             // Ask the configured local LLM model to generate the review response.
             val llmResponse = llmClient.generate(
                 model = model,
@@ -65,13 +65,21 @@ class ReviewAgent(
                 userPrompt = userPrompt
             )
 
+            llmResponse.metrics?.let { metrics ->
+                logger.llmMetricsRecorded(
+                    agentId = id,
+                    metrics = metrics
+                )
+            }
+
             // Build a structured result for the orchestrator.
             AgentResult(
                 agentId = id,
                 role = "Code review agent",
                 success = true,
                 model = llmResponse.actualModel,
-                output = llmResponse.text
+                output = llmResponse.text,
+                llmMetrics = llmResponse.metrics
             )
         } catch (exception : Exception) {
             // Return a failed result instead of crashing the full orchestration workflow.

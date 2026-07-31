@@ -1,5 +1,6 @@
 package org.dcac.logging
 
+import org.dcac.metrics.LlmGenerationMetrics
 import org.dcac.models.TaskComplexity
 import org.dcac.models.WorkflowType
 import org.dcac.prompts.PromptDomain
@@ -26,4 +27,9 @@ interface OrchestrationLogger {
     fun promptSelected(agentId: String, promptDomain: PromptDomain, promptPath: String)
     fun finalResponseStarted()
     fun orchestrationCompleted(duration: String)
+
+    fun llmMetricsRecorded(
+        agentId: String,
+        metrics: LlmGenerationMetrics
+    )
 }

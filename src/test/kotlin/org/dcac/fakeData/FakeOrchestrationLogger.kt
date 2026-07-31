@@ -1,6 +1,7 @@
 package org.dcac.fakeData
 
 import org.dcac.logging.OrchestrationLogger
+import org.dcac.metrics.LlmGenerationMetrics
 import org.dcac.models.TaskComplexity
 import org.dcac.models.WorkflowType
 import org.dcac.prompts.PromptDomain
@@ -43,4 +44,9 @@ class FakeOrchestrationLogger : OrchestrationLogger {
 
     override fun finalResponseStarted() = Unit
     override fun orchestrationCompleted(duration: String) = Unit
+
+    override fun llmMetricsRecorded(
+        agentId: String,
+        metrics: LlmGenerationMetrics
+    ) = Unit
 }

@@ -5,7 +5,7 @@ package org.dcac.prompts
  */
 enum class PromptDomain {
     // Default domain used when no specialized prompt applies.
-    GENERAL,
+    GENERIC,
 
     // Plain domain/data models, DTOs, value objects, and simple data classes.
     MODEL,

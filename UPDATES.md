@@ -664,7 +664,7 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - `TaskRouter` maps planned agent identifiers to concrete agent instances
     - `CodeAgent` and `ReviewAgent` continue using the centralized prompt domain from `ExecutionContext`
 
-    - 🧪 **Test suite realignment**
+  - 🧪 **Test suite realignment**
     - Updated tests to distinguish explicit workflow execution from planning fallback execution
     - Updated `AiOrchestratorTest` to verify that explicit workflow types bypass `PlanningAgent`
     - Updated `AiOrchestratorTest` to verify that tasks without `requestedWorkflowType` still use planning fallback
@@ -696,6 +696,161 @@ This file documents key technical updates applied to the KotlinLocalAiOrchestrat
     - Kotlin-side artifact extraction and validation are not implemented yet
     - `ReviewAgent` can still review non-code outputs if `CodeAgent` fails to produce reviewable code
     - No correction loop exists yet between `ReviewAgent` and `CodeAgent`
+
+
+### 🔹 **Update #11**
+
+  - 💬 **General response workflow**
+    - Added `GeneralAgent` for general technical questions, explanations, comparisons, and architectural guidance
+    - Added the dedicated `prompts/general/general.txt` system prompt
+    - Added `ollama.models.general` to `application.properties`
+    - Added `generalModel` to `ApplicationConfig`
+    - Updated `ApplicationConfigLoader` to load the configured general-response model
+    - Registered `GeneralAgent` in both `App.kt` and `UiApp.kt`
+    - Updated `WorkflowPlanner` so `WorkflowType.GENERAL` resolves directly to the `general` agent
+    - Updated `ResponseSynthesizer` to include general-agent output in the final response
+    - Updated the temporary `DOCUMENTATION_ONLY` mapping to use the currently available review agent until a dedicated documentation agent is implemented
+
+  - 🎯 **General workflow and prompt-domain clarification**
+    - Renamed the fallback prompt domain from `PromptDomain.GENERAL` to `PromptDomain.GENERIC`
+    - Updated `ExecutionContext` to use `PromptDomain.GENERIC` as its default prompt domain
+    - Updated `PromptSelector` to return `PromptDomain.GENERIC` when no specialized domain is detected
+    - Kept existing generic prompt paths:
+      - `prompts/code/general.txt`
+      - `prompts/review/general.txt`
+    - Clarified the distinction between:
+      - `WorkflowType.GENERAL`, which selects `GeneralAgent`
+      - `PromptDomain.GENERIC`, which represents the fallback prompt domain
+
+  - 📊 **Ollama generation metrics**
+    - Added the new `org.dcac.metrics` package
+    - Added `LlmGenerationMetrics`
+    - Extended the Ollama response DTO with:
+      - total duration
+      - model loading duration
+      - prompt token count
+      - prompt evaluation duration
+      - generated token count
+      - generation duration
+    - Added `OllamaMetricsMapper` to convert Ollama response values into application metrics
+    - Added duration conversion from nanoseconds to milliseconds
+    - Added prompt tokens-per-second calculation
+    - Added generation tokens-per-second calculation
+    - Added estimated server-overhead calculation
+    - Added client round-trip timing around the Ollama HTTP request
+    - Added optional metrics to `LlmResponse`
+    - Added optional metrics to `AgentResult`
+
+  - 🪵 **Metrics logging**
+    - Added `llmMetricsRecorded` to `OrchestrationLogger`
+    - Updated `ConsoleOrchestrationLogger` to display generation metrics
+    - Updated `CodeAgent` to publish and return its generation metrics
+    - Updated `ReviewAgent` to publish and return its generation metrics
+    - Updated `GeneralAgent` to publish and return its generation metrics
+    - Updated `FakeOrchestrationLogger` to support the new metrics logging contract
+
+  - ⚡ **Local model performance comparison**
+    - Added metrics required to compare local model configurations
+    - Compared separate Qwen and DeepSeek code/review configurations
+    - Compared single-model and mixed-model workflows
+    - Identified model loading and model switching as major contributors to total workflow latency
+    - Verified that warm-model execution is significantly faster than cold-model execution
+    - Selected `deepseek-coder-v2:16b` as the current model for both code generation and code review
+    - Kept `qwen3:8b` as the current planning model
+    - Selected `qwen3:14b` as the current general-response model
+    - Kept model names configurable through `application.properties`
+
+  - 🖥️ **Swing desktop interface**
+    - Added the new `org.dcac.ui` package
+    - Added `UiApp.kt` as the Swing application entry point
+    - Added `MainWindow` as the main desktop window
+    - Added `UiOrchestrationLogger` to send orchestration events to the interface
+    - Added a user-instruction input area
+    - Added placeholder behavior for the instruction input
+    - Added explicit workflow selection through a combo box
+    - Set `CODE_REVIEW` as the default selected workflow
+    - Added `UNKNOWN` as the UI value that sends no explicit workflow type and activates `PlanningAgent`
+    - Added a Run button with input validation and running-state handling
+    - Added background orchestration execution with a single-thread executor
+    - Kept Swing component updates on the event-dispatch thread
+    - Added UI error reporting through logs and dialogs
+
+  - 🧾 **Workflow and response visualization**
+    - Added a dedicated workflow and logs panel
+    - Added live logs for:
+      - task validation
+      - prompt-domain selection
+      - planning
+      - workflow selection
+      - complexity
+      - routing
+      - prompt paths
+      - agent execution
+      - final response synthesis
+      - orchestration completion
+    - Added separate response tabs for:
+      - final response
+      - CodeAgent
+      - ReviewAgent
+      - GeneralAgent
+    - Added automatic clearing of previous logs, responses, and metrics before a new execution
+
+  - 📈 **Visual metrics cards**
+    - Added one metrics card per agent that returns Ollama metrics
+    - Organized metrics into a 3×3 grid
+    - Added visual values for:
+      - agent ID
+      - total duration
+      - loading duration
+      - prompt duration
+      - generation duration
+      - server overhead
+      - prompt tokens per second
+      - generation tokens per second
+      - generated token count
+    - Added vertical card stacking for workflows containing multiple agents
+    - Configured metric cards to appear when the corresponding generation metrics become available
+
+  - 🏷️ **UI task creation**
+    - Added unique UI task identifiers based on the current timestamp
+    - Added deterministic task-title generation
+    - Added whitespace normalization for generated titles
+    - Added instruction shortening for long task titles
+    - Included the task ID, selected workflow, and shortened instruction in generated task titles
+    - Used `UNKNOWN` in the generated title when no explicit workflow is selected
+
+  - 🧹 **Console demonstration cleanup**
+    - Reduced the number of demonstration tasks executed by `App.kt`
+    - Kept focused `CODE_ONLY` and `CODE_REVIEW` demonstration tasks
+    - Kept the planning-fallback task available as a commented example
+    - Reduced unnecessary local LLM executions during development
+  
+  - 🧪 **Runtime validation**
+    - Verified the desktop interface with explicit `CODE_ONLY` and `CODE_REVIEW` workflows
+    - Verified that `UNKNOWN` activates `PlanningAgent`
+    - Verified live workflow logs in the Swing interface
+    - Verified separated code and review responses
+    - Verified visual metric cards for code and review agents
+    - Verified cold-model and warm-model duration differences
+    - Verified same-model code and review execution with `deepseek-coder-v2:16b`
+    - Verified that the application remains responsive while local LLM generation runs in the background
+
+  - ⚠️ **Current limitations**
+    - `PlanningAgent` metrics are not yet propagated to the logger or desktop interface
+    - Metrics are displayed for the current execution but are not persisted
+    - Cold-model and warm-model executions are not automatically classified
+    - The Swing interface does not provide execution cancellation
+    - Execution history is not persisted
+    - No external API layer is implemented
+    - Generated Kotlin code is not extracted or validated before review
+    - `ReviewAgent` can still run when `CodeAgent` did not produce reviewable code
+    - Review output is not parsed into a deterministic Kotlin structure
+    - No bounded correction loop exists between `ReviewAgent` and `CodeAgent`
+    - Dedicated `TestAgent` and `DocumentationAgent` implementations do not exist
+    - Generated code is displayed but not written to project files
+    - Client timeouts, retries, and model availability checks are not implemented
+    - Agent execution remains sequential
+    - A failed agent does not currently stop later selected agents from running
 
 
 ## 🤝 **Contributions**

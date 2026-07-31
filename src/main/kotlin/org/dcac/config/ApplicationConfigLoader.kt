@@ -19,7 +19,8 @@ class ApplicationConfigLoader(
             ollamaBaseUrl = properties.required("ollama.baseUrl"),
             planningModel = properties.required("ollama.models.planning"),
             codeModel = properties.required("ollama.models.code"),
-            reviewModel = properties.required("ollama.models.review")
+            reviewModel = properties.required("ollama.models.review"),
+            generalModel = properties.required("ollama.models.general")
         )
     }
 
